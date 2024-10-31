@@ -71,13 +71,14 @@ def filter_by_position(df_poll:pl.DataFrame, posit_codes:list[int])->pl.DataFram
 '''
 def class_ideologica_chart(df_partidos:pl.DataFrame, df_colors:pl.DataFrame)->alt.vegalite.v5.api.Chart:
     df_colors_tmp = df_colors.sort(by="MEDIA_IDEOL") 
-    _domains = df_colors_tmp.get_column("SG_PARTIDO").to_list()
-    _range = df_colors_tmp.get_column("cor").to_list()
+    
+    _domains = ["EE","E","CE","C","CD","D","ED"]
+    _range = ["#7F0000","#FF0000","#C54B53","#FFD966","#97A3FF","#262DDA","#030886"]
     color_scale = alt.Scale(
         domain=_domains,
         range=_range
     )   
-    
+
     #svg que renderiza uma pessoinha
     person = (
         "M1.7 -1.7h-0.8c0.3 -0.2 0.6 -0.5 0.6 -0.9c0 -0.6 "
@@ -102,8 +103,9 @@ def class_ideologica_chart(df_partidos:pl.DataFrame, df_colors:pl.DataFrame)->al
                 scale=alt.Scale(nice=True)
         ),
         shape=alt.ShapeValue(person),
-        color=alt.Color('SG_PARTIDO:O',
-            scale=color_scale, legend=None
+        color=alt.Color('SG_POSIC_IDEOLOGICO:O',
+            scale=color_scale,
+            title="Ideologia"
         ),
         tooltip=[
             alt.Tooltip("SG_PARTIDO:O", title="Partido"),
@@ -445,4 +447,88 @@ def box_plots_votting_by_region(df:pl.DataFrame, title:str)->alt.vegalite.v5.api
             fontSize=14,
             anchor='middle',
         )
+    )
+
+def scatter_votting_by_regions(df_tmp:pl.DataFrame, chart_title:str)->alt.vegalite.v5.api.Chart:
+    scatter_plot = alt.Chart().mark_point().encode(
+        x=alt.X('PCT_VOTOS_18:Q', title="2018", axis=alt.Axis(labelAngle=-90)),
+        y=alt.Y('PCT_VOTOS_22:Q', title="2022"),
+        color=alt.Color("uf:N", legend=None),
+        tooltip=[
+            alt.Tooltip("NM_REGIAO:N", title="Região"),
+            alt.Tooltip("uf:N", title="Estado"),
+            alt.Tooltip("nome:N", title="Município"),
+            alt.Tooltip("PCT_VOTOS_18:Q", format=".2%", title="Perc. Votos em 2018"),
+            alt.Tooltip("PCT_VOTOS_22:Q", format=".2%", title="Perc. Votos em 2022"),
+        ],
+    ).properties(
+        width=170,
+        height=170
+    )
+    
+    line_plot =(
+        alt.Chart(pl.DataFrame({"x":[0,1], "y":[0,1]}))
+        .mark_line(color="#9ECAE9")
+        .encode(
+            x=alt.X("x:Q"),
+            y=alt.Y("y:Q")
+        )
+    )
+    
+    return (
+    alt.layer(scatter_plot, line_plot, data=df_tmp)
+        .facet(
+            column = alt.Column("NM_REGIAO:N", title="", sort=alt.SortField("NM_REGIAO")),
+            center=True
+        )
+    ).properties(
+        title=f'{chart_title}'
+    ).configure_title(
+        anchor='middle', fontSize=14    
+    )
+
+def scatter_facet_votting_by_regions(df_tmp:pl.DataFrame, chart_title:str)->alt.vegalite.v5.api.Chart:
+    line_plot =(
+        alt.Chart(pl.DataFrame({"x":[0,1], "y":[0,1]}))
+        .mark_line(fillOpacity=0, color="#9ECAE9", opacity=.6)
+        .encode(
+            x=alt.X("x:Q"),
+            y=alt.Y("y:Q")
+        )
+    )
+    
+    scatter_plot= alt.Chart().mark_point().encode(
+        x=alt.X('PCT_VOTOS_18:Q', title="2018"),
+        y=alt.Y('PCT_VOTOS_22:Q',title="2022"),
+        color=alt.Color("NM_REGIAO:N", title="Região", sort=alt.SortField("NM_REGIAO:N")),
+        tooltip=[
+            alt.Tooltip("NM_REGIAO:N", title="Região"),
+            alt.Tooltip("uf:N", title="Estado"),
+            alt.Tooltip("nome:N", title="Município"),
+            alt.Tooltip("PCT_VOTOS_18:Q", format=".2%", title="Perc. Votos em 2018"),
+            alt.Tooltip("PCT_VOTOS_22:Q", format=".2%", title="Perc. Votos em 2022"),
+        ],
+    ).properties(
+        width=170,
+        height=170
+    )
+    
+    return alt.vconcat(
+        *(
+            alt.layer(scatter_plot, line_plot, data=df_tmp)
+              .facet(facet='uf:N')
+              .transform_filter(alt.datum.NM_REGIAO == val)
+            for val in df_tmp.get_column("NM_REGIAO").unique().sort().to_list()
+        ), title=f"{chart_title}"
+    ).configure_axisX(
+        orient="top",
+    ).configure_facet(
+        columns=4, spacing=10
+    ).configure_headerFacet(
+        labelOrient="bottom",
+        title = None    
+    ).resolve_scale(
+        #color="independent"
+    ).configure_title(
+        anchor='middle', fontSize=14
     )
