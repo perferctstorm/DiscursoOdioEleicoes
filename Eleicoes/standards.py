@@ -214,7 +214,7 @@ def grouped_bar_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_colors:pl.D
     Desenha o mapa do Brasil por cidade comparando a votação de um partido entre duas eleições
 '''
 def choropleth_votting(df_2018:pl.DataFrame, df_2022:pl.DataFrame, 
-                       chart_title:str)->alt.vegalite.v5.api.Chart:
+                       chart_title:str, parties:list[str], years:list[int]=[2018,2022])->alt.vegalite.v5.api.Chart:
     
     df_facet = pl.concat([df_2018,df_2022])
     
@@ -240,7 +240,7 @@ def choropleth_votting(df_2018:pl.DataFrame, df_2022:pl.DataFrame,
             fillOpacity=0,
             strokeWidth=1.5
         )
-    )
+    )   
     
     background_states:alt.vegalite.v5.api.Chart = (
         alt.Chart(alt.Data(states))
@@ -255,14 +255,14 @@ def choropleth_votting(df_2018:pl.DataFrame, df_2022:pl.DataFrame,
     *(
         (
             background_reg + background_states +
-            alt.Chart(cities, title=f"{ano}") \
+            alt.Chart(cities) \
             .mark_geoshape(
                 stroke="#000", strokeWidth=.035, fillOpacity=.6
             ).project(
                 type="equirectangular"  
             ).transform_lookup(
                 lookup='properties.id',
-                from_=alt.LookupData(df_facet.filter( pl.col("ANO_ELEICAO")==ano ), 
+                from_=alt.LookupData(df_facet.filter( (pl.col("ANO_ELEICAO")==ano) & (pl.col("SIGLA_2022")==party) ), 
                     'codigo_ibge', 
                     fields=list(["uf", "nome", "QT_VOTOS_VALIDOS", "TOTAL_VOTOS_MUNIC", "PCT_VOTOS_MUNIC"])
                 )
@@ -276,13 +276,15 @@ def choropleth_votting(df_2018:pl.DataFrame, df_2022:pl.DataFrame,
                     alt.Tooltip("QT_VOTOS_VALIDOS:Q",format=",d", title="Votos"),  
                     alt.Tooltip("TOTAL_VOTOS_MUNIC:Q", format=",d", title="Total Votos Município")
                 ]
-            )
-        )for ano in [2018, 2022]
+            ).properties(title=f"{party} ({ano})")
+        ) for ano in years for party in parties
     ),
         columns=2, title=f"{chart_title}"
     ).resolve_scale(
         color="independent"
-    ).configure_title(anchor='middle', fontSize=14)
+    ).configure_title(
+        anchor='middle', fontSize=12,
+    )
 
 '''
     Filtra os votos de duas eleições com o percentual de votos do partido em relação ao município
@@ -320,7 +322,7 @@ def filter_choropleth_votting(df_2018:pl.DataFrame,df_2022:pl.DataFrame, df_muni
    Box plot com percentual de votos por partido em relação ao somatório dos demais partidos
    
 '''
-def box_plots_votting_by_uf(df:pl.DataFrame, title:str)->alt.vegalite.v5.api.Chart:
+def box_plots_votting_by_uf(df:pl.DataFrame, title:str, facet_column:str="ANO_ELEICAO")->alt.vegalite.v5.api.Chart:
     boxes = (
         alt.Chart()
         .mark_boxplot()
@@ -370,7 +372,7 @@ def box_plots_votting_by_uf(df:pl.DataFrame, title:str)->alt.vegalite.v5.api.Cha
     return (
         alt.layer(boxes, bars, data=df)
         .facet(
-            column=alt.Column('ANO_ELEICAO:N', title=""), 
+            column=alt.Column(f'{facet_column}:N', title=""), 
             title=f"{title}", 
             center=True
         ).configure_title(
@@ -384,7 +386,7 @@ def box_plots_votting_by_uf(df:pl.DataFrame, title:str)->alt.vegalite.v5.api.Cha
    Box plot com percentual de votos por partido em relação ao somatório dos demais partidos
    
 '''
-def box_plots_votting_by_region(df:pl.DataFrame, title:str)->alt.vegalite.v5.api.Chart:
+def box_plots_votting_by_region(df:pl.DataFrame, title:str, facet_column:str="ANO_ELEICAO")->alt.vegalite.v5.api.Chart:
     boxes = (
         alt.Chart()
         .mark_boxplot()
@@ -439,7 +441,7 @@ def box_plots_votting_by_region(df:pl.DataFrame, title:str)->alt.vegalite.v5.api
     return (
         alt.layer(boxes, bars, data=df)
         .facet(
-            column=alt.Column('ANO_ELEICAO:N', title=""), 
+            column=alt.Column(f'{facet_column}:N', title=""), 
             title=f"{title}",
             center=True
         ).configure_title(
@@ -449,17 +451,20 @@ def box_plots_votting_by_region(df:pl.DataFrame, title:str)->alt.vegalite.v5.api
         )
     )
 
-def scatter_votting_by_regions(df_tmp:pl.DataFrame, chart_title:str)->alt.vegalite.v5.api.Chart:
+def scatter_votting_by_regions(df_tmp:pl.DataFrame, chart_title:str, 
+                               axis_cols:list[str]=["PCT_VOTOS_18","PCT_VOTOS_22"],
+                               axis_titles:list[str]=["2018","2022"]
+                            )->alt.vegalite.v5.api.Chart:
     scatter_plot = alt.Chart().mark_point().encode(
-        x=alt.X('PCT_VOTOS_18:Q', title="2018", axis=alt.Axis(labelAngle=-90)),
-        y=alt.Y('PCT_VOTOS_22:Q', title="2022"),
+        x=alt.X(f'{axis_cols[0]}:Q', title=f"{axis_titles[0]}", axis=alt.Axis(labelAngle=-90)),
+        y=alt.Y(f'{axis_cols[1]}:Q', title=f"{axis_titles[1]}"),
         color=alt.Color("uf:N", legend=None),
         tooltip=[
             alt.Tooltip("NM_REGIAO:N", title="Região"),
             alt.Tooltip("uf:N", title="Estado"),
             alt.Tooltip("nome:N", title="Município"),
-            alt.Tooltip("PCT_VOTOS_18:Q", format=".2%", title="Perc. Votos em 2018"),
-            alt.Tooltip("PCT_VOTOS_22:Q", format=".2%", title="Perc. Votos em 2022"),
+            alt.Tooltip(f'{axis_cols[0]}:Q', format=".2%", title="Perc. Votos em 2018"),
+            alt.Tooltip(f'{axis_cols[1]}:Q', format=".2%", title="Perc. Votos em 2022"),
         ],
     ).properties(
         width=170,
@@ -487,7 +492,9 @@ def scatter_votting_by_regions(df_tmp:pl.DataFrame, chart_title:str)->alt.vegali
         anchor='middle', fontSize=14    
     )
 
-def scatter_facet_votting_by_regions(df_tmp:pl.DataFrame, chart_title:str)->alt.vegalite.v5.api.Chart:
+def scatter_facet_votting_by_regions(df_tmp:pl.DataFrame, chart_title:str,
+                               axis_cols:list[str]=["PCT_VOTOS_18","PCT_VOTOS_22"],
+                               axis_titles:list[str]=["2018","2022"])->alt.vegalite.v5.api.Chart:
     line_plot =(
         alt.Chart(pl.DataFrame({"x":[0,1], "y":[0,1]}))
         .mark_line(fillOpacity=0, color="#9ECAE9", opacity=.6)
@@ -498,15 +505,15 @@ def scatter_facet_votting_by_regions(df_tmp:pl.DataFrame, chart_title:str)->alt.
     )
     
     scatter_plot= alt.Chart().mark_point().encode(
-        x=alt.X('PCT_VOTOS_18:Q', title="2018"),
-        y=alt.Y('PCT_VOTOS_22:Q',title="2022"),
+        x=alt.X(f'{axis_cols[0]}:Q', title=f"{axis_titles[0]}", axis=alt.Axis(labelAngle=-90)),
+        y=alt.Y(f'{axis_cols[1]}:Q', title=f"{axis_titles[1]}"),
         color=alt.Color("NM_REGIAO:N", title="Região", sort=alt.SortField("NM_REGIAO:N")),
         tooltip=[
             alt.Tooltip("NM_REGIAO:N", title="Região"),
             alt.Tooltip("uf:N", title="Estado"),
             alt.Tooltip("nome:N", title="Município"),
-            alt.Tooltip("PCT_VOTOS_18:Q", format=".2%", title="Perc. Votos em 2018"),
-            alt.Tooltip("PCT_VOTOS_22:Q", format=".2%", title="Perc. Votos em 2022"),
+            alt.Tooltip(f'{axis_cols[0]}:Q', format=".2%", title=f"Perc. Votos em {axis_titles[0]}"),
+            alt.Tooltip(f'{axis_cols[1]}:Q', format=".2%", title=f"Perc. Votos em {axis_titles[1]}"),
         ],
     ).properties(
         width=170,
