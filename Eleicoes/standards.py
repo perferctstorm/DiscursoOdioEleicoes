@@ -282,7 +282,7 @@ def choropleth_votting(df_2018:pl.DataFrame, df_2022:pl.DataFrame,
         columns=2, title=f"{chart_title}"
     ).resolve_scale(
         color="independent"
-    ).configure_title(anchor='middle', fontSize=20)
+    ).configure_title(anchor='middle', fontSize=14)
 
 '''
     Filtra os votos de duas eleições com o percentual de votos do partido em relação ao município
