@@ -322,103 +322,127 @@ def filter_choropleth_votting(df_2018:pl.DataFrame,df_2022:pl.DataFrame, df_muni
    Box plot com percentual de votos por partido em relação ao somatório dos demais partidos
    
 '''
-def box_plots_votting_by_uf(df:pl.DataFrame, title:str, facet_column:str="ANO_ELEICAO")->alt.vegalite.v5.api.Chart:
-    boxes = (
-        alt.Chart()
-        .mark_boxplot()
+def box_plots_votting_by_uf(df:pl.DataFrame, title:str, 
+                            facet_column:str="ANO_ELEICAO",
+                            facet_row:str="SIGLA_2022")->alt.vegalite.v5.api.Chart:
+    base = (
+        alt.Chart(df)
         .encode(
-            x=alt.X("PCT_VOTOS_MUNIC:Q", title="% de Votos", axis=alt.Axis(format='%', labelAngle=-90) ),
-            y=alt.Y("uf:N", title="Estado", sort=alt.SortField(field="NM_REGIAO", order='ascending') ),
+            x=alt.X("PCT_VOTOS_MUNIC:Q", title="% de Votos",                     
+                    axis=alt.Axis(format='%', labelAngle=-90) ),
+            y=alt.Y("uf:O", title="Estado", 
+                    sort=alt.SortField(field="NM_REGIAO"), 
+            ),            
             color=alt.Color("NM_REGIAO:N", title="Região"),
+        )
+    )
+    
+    boxes = (
+        base
+        .mark_boxplot()
+        .encode(            
             tooltip=[
                 alt.Tooltip("uf:N", title="Estado"),
                 alt.Tooltip("nome:N", title="Município"),
                 alt.Tooltip("TOTAL_VOTOS_MUNIC:Q", format=",d", title="Total Geral de Votos"),
-                alt.Tooltip("QT_VOTOS_VALIDOS:Q", format=",d", title="Votos no PT"),
-                alt.Tooltip("PCT_VOTOS_MUNIC:Q", format=".2%", title="% Votos no PT"),
+                alt.Tooltip("QT_VOTOS_VALIDOS:Q", format=",d", title="Total Votos Partido"),
+                alt.Tooltip("PCT_VOTOS_MUNIC:Q", format=".2%", title="% Votos"),
             ]
         )
     )
-    
+
     bars = (
-        alt.Chart()
+        base
         .transform_aggregate(
-            min="min(PCT_VOTOS_MUNIC):Q",
+            PCT_VOTOS_UF="sum(PCT_VOTOS_MUNIC):Q",
+            total="sum(TOTAL_VOTOS_MUNIC):Q",
+            total_partido="sum(QT_VOTOS_VALIDOS):Q",
             max="max(PCT_VOTOS_MUNIC):Q",
             mean="mean(PCT_VOTOS_MUNIC):Q",
             median="median(PCT_VOTOS_MUNIC):Q",
+            min="min(PCT_VOTOS_MUNIC):Q",
             q1="q1(PCT_VOTOS_MUNIC):Q",
             q3="q3(PCT_VOTOS_MUNIC):Q",
             count="count()",
-            groupby=["ANO_ELEICAO","NM_REGIAO", "uf"]
+            groupby=["NM_REGIAO", "uf"]
         ).mark_bar(opacity=0)
         .encode(
-            y=alt.Y('uf:O', sort=alt.SortField(field="NM_REGIAO", order='ascending')),
-            x='q1:Q',
+            x=alt.X('q1:Q'),
             x2='q3:Q',
             color=alt.Color("NM_REGIAO:N", title="Região"),
             tooltip=[
                 alt.Tooltip("NM_REGIAO:N", title="Região"),
-                alt.Tooltip("uf:N", title="Estado"),        
+                alt.Tooltip("uf:N", title="uf"),
+                alt.Tooltip("total:Q",format=",d", title="Total Votos"),
+                alt.Tooltip("total_partido:Q",format=",d", title="Total Votos Partido"),
                 alt.Tooltip('max:Q', title="Máximo", format=".2%"),
-                alt.Tooltip('q3:Q', title="3o Quartil", format=".2%"),
-                alt.Tooltip('median:Q', title="Mediana", format=".2%"),
-                alt.Tooltip('q1:Q', title="1o Quartil", format=".2%"),
                 alt.Tooltip('min:Q', title="Mínimo", format=".2%"),
+                alt.Tooltip('q3:Q', title="3o Quartil", format=".2%"),                
+                alt.Tooltip('q1:Q', title="1o Quartil", format=".2%"),
+                alt.Tooltip('median:Q', title="Mediana", format=".2%"),                
             ]
+        ).properties(
+            width=200
         )
     )
-    
-    return (
-        alt.layer(boxes, bars, data=df)
+
+    return (alt.layer(boxes, bars)
         .facet(
-            column=alt.Column(f'{facet_column}:N', title=""), 
-            title=f"{title}", 
-            center=True
-        ).configure_title(
-            #align="center",
-            fontSize=14,
-            anchor='middle',
+            column=alt.Column(f"{facet_column}:Q", title=""),
+            row=alt.Row(f'{facet_row}:N', title=""),
+            title=f"{title}"
         )
+    ).resolve_scale(
+        y='independent'
+    ).configure_title(
+        fontSize=14,
+        anchor='middle'        
     )
 
 '''
    Box plot com percentual de votos por partido em relação ao somatório dos demais partidos
    
 '''
-def box_plots_votting_by_region(df:pl.DataFrame, title:str, facet_column:str="ANO_ELEICAO")->alt.vegalite.v5.api.Chart:
+def box_plots_votting_by_region(df:pl.DataFrame, title:str)->alt.vegalite.v5.api.Chart:
+
+    base = (
+        alt.Chart(df)
+        .encode(
+            x=alt.X("NM_REGIAO:N"),
+            color=alt.Color("NM_REGIAO:N").legend(None)
+        )
+    )
+    
     boxes = (
-        alt.Chart()
+        base
         .mark_boxplot()
         .encode(
-        y=alt.Y("PCT_VOTOS_MUNIC:Q", title="Votação", axis=alt.Axis(format='%')).scale(zero=False),
-        x=alt.X("NM_REGIAO:N", title=""),
-        color=alt.Color("NM_REGIAO:N").legend(None),
-       tooltip=[
-            alt.Tooltip("NM_REGIAO:N", title="Região"),
-            alt.Tooltip("uf:N", title="Estado"),        
-            alt.Tooltip('max:Q', title="Máximo", format=".2%"),
-            alt.Tooltip('q3:Q', title="3o Quartil", format=".2%"),
-            alt.Tooltip('median:Q', title="Mediana", format=".2%"),
-            alt.Tooltip('q1:Q', title="1o Quartil", format=".2%"),
-            alt.Tooltip('min:Q', title="Mínimo", format=".2%"),
-        ]
-        ).properties(
-            width=200
+            x=alt.X('NM_REGIAO:N',  title="", sort=alt.SortField(field="NM_REGIAO", order='ascending')),
+            y=alt.Y("PCT_VOTOS_MUNIC:Q", title="Votação", axis=alt.Axis(format='%')).scale(zero=False),
+            tooltip=[
+                alt.Tooltip("NM_REGIAO:N", title="Região"),
+                alt.Tooltip("uf:N", title="Estado"),
+                alt.Tooltip("nome:N", title="Município"),
+                alt.Tooltip("PCT_VOTOS_MUNIC:Q", title="Votação", format=".2%"),
+                alt.Tooltip("TOTAL_VOTOS_MUNIC:Q", format=",d", title="Total Geral de Votos"),
+                alt.Tooltip("QT_VOTOS_VALIDOS:Q", format=",d", title="Total Votos Partido"),
+                alt.Tooltip("PCT_VOTOS_MUNIC:Q", format=".2%", title="% Votos"),                
+            ]
         )
     )
     
     bars = (
-        alt.Chart()
+        base
         .transform_aggregate(
             PCT_VOTOS_UF="sum(PCT_VOTOS_MUNIC):Q",
             max="max(PCT_VOTOS_MUNIC):Q",
             mean="mean(PCT_VOTOS_MUNIC):Q",
             median="median(PCT_VOTOS_MUNIC):Q",
+            min="min(PCT_VOTOS_MUNIC):Q",
             q1="q1(PCT_VOTOS_MUNIC):Q",
             q3="q3(PCT_VOTOS_MUNIC):Q",
             count="count()",
-            groupby=["ANO_ELEICAO","NM_REGIAO"]
+            groupby=["SIGLA_2022","NM_REGIAO"]
         ).mark_bar(opacity=0)
         .encode(
             x=alt.X('NM_REGIAO:N', sort=alt.SortField(field="NM_REGIAO", order='ascending')),
@@ -437,18 +461,18 @@ def box_plots_votting_by_region(df:pl.DataFrame, title:str, facet_column:str="AN
             width=200
         )
     )
-        
-    return (
-        alt.layer(boxes, bars, data=df)
+    
+    return (alt.layer(boxes, bars)
         .facet(
-            column=alt.Column(f'{facet_column}:N', title=""), 
-            title=f"{title}",
-            center=True
-        ).configure_title(
-            #align="center",
-            fontSize=14,
-            anchor='middle',
+            column=alt.Column("ANO_ELEICAO:Q", title=""),
+            row=alt.Row('SIGLA_2022:N', title=""),
+            title=f"{title}"
         )
+    ).resolve_scale(
+        color="independent"
+    ).configure_title(
+        fontSize=14,
+        anchor='middle'        
     )
 
 def scatter_votting_by_regions(df_tmp:pl.DataFrame, chart_title:str, 
@@ -484,6 +508,7 @@ def scatter_votting_by_regions(df_tmp:pl.DataFrame, chart_title:str,
     alt.layer(scatter_plot, line_plot, data=df_tmp)
         .facet(
             column = alt.Column("NM_REGIAO:N", title="", sort=alt.SortField("NM_REGIAO")),
+            row=alt.Row('SIGLA_2022:N', title=""),
             center=True
         )
     ).properties(
