@@ -1,0 +1,36 @@
+SG_PARTIDO,SG_PARTIDO_INFO,MEDIA_IDEOL,NOME,NR_PARTIDO,POSIC_IDEOLOGICO,SG_POSIC_IDEOLOGICO,Observação,Fonte espectro
+PSTU,PSTU,"0,51",PARTIDO SOCIALISTA DOS TRABALHADORES UNIFICADO,16,EXTREMA_ESQUERDA,EE,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PCO,PCO,"0,61",PARTIDO DA CAUSA OPERÁRIA,29,EXTREMA_ESQUERDA,EE,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PCB,PCB,"0,91",PARTIDO COMUNISTA BRASILEIRO,21,EXTREMA_ESQUERDA,EE,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PSOL,PSOL,"1,28",PARTIDO SOCIALISMO E LIBERDADE,50,EXTREMA_ESQUERDA,EE,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PCdoB,PCdoB,"1,92",PARTIDO COMUNISTA DO BRASIL,65,ESQUERDA,E,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PT,PT,"2,97",PARTIDO DOS TRABALHADORES,13,CENTRO_ESQUERDA,CE,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PDT,PDT,"3,92",PARTIDO DEMOCRÁTICO TRABALHISTA,12,CENTRO_ESQUERDA,CE,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PSB,PSB,"4,05",PARTIDO SOCIALISTA BRASILEIRO,40,CENTRO_ESQUERDA,CE,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+REDE,REDE,"4,77",REDE SUSTENTABILIDADE,18,CENTRO_DIREITA,C,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PPS,PPS,"4,92",Partido Popular Socialista,23,CENTRO_DIREITA,C,,
+PV,PV,"5,29",PARTIDO VERDE,43,CENTRO_DIREITA,C,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PTB,PTB,"6,1",Partido Trabalhista Brasileiro,14,DIREITA,CD,,
+AVANTE,AVANTE,"6,32",AVANTE,70,DIREITA,CD,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+SOLIDARIEDADE,SOLIDARIEDADE(+PROS),"6,5",SOLIDARIEDADE,77,DIREITA,CD,SOLIDARIEDADE incorporou PROS em 2022,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PMN,PMN,"6,88",Partido da Mobilização Nacional,33,DIREITA,CD,,
+PMB,PMB,"6,9",PARTIDO DA MULHER BRASILEIRA,35,DIREITA,CD,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PHS,PHS,"6,96",Partido Humanista da Solidariedade,31,DIREITA,CD,,
+MDB,MDB,"7,01",MOVIMENTO DEMOCRÁTICO BRASILEIRO,15,DIREITA,CD,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PSD,PSD,"7,09",PARTIDO SOCIAL DEMOCRÁTICO,55,DIREITA,CD,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PSDB,PSDB,"7,11",PARTIDO DA SOCIAL DEMOCRACIA BRASILEIRA,45,DIREITA,CD,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PODE,PODE(+PHS+PSC),"7,24",PODEMOS,19,DIREITA,D,PHS foi incorporado ao PODE,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PPL,PPL,"7,27",PARTIDO PÁTRIA LIVE,54,DIREITA,D,Extinto em 2019,
+PRTB,PRTB,"7,45",PARTIDO RENOVADOR TRABALHISTA BRASILEIRO,28,DIREITA,D,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PROS,PROS,"7,47",Partido Republicano da Ordem Social,90,DIREITA,D,,
+PRP,PRP,"7,59",Partido Republicano Progressista,44,DIREITA,D,,
+PR,PR,"7,78",Partido Republicano,22,DIREITA,D,,
+PRB,PRB,"7,78",Partido Republicano Brasileiro,10,DIREITA,D,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PSC,PSC,"8,33",Partido Social Cristão,20,DIREITA,D,,
+PTC,PTC,"7,86",Partido Trabalhista Cristão,36,DIREITA,D,,
+DC,DC,"8,11",DEMOCRACIA CRISTÃ,27,DIREITA,D,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PSL,PSL,"8,11",Partido Social Liberal,17,DIREITA,D,,
+NOVO,NOVO,"8,13",Partido Novo,30,DIREITA,D,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PP,PP,"8,2",PROGRESSISTAS,11,DIREITA,D,,"BOLOGNESI, Bruno; RIBEIRO, Ednaldo; CODATO, Adrian.Uma Nova Classificação Ideológica dos Partidos Políticos Brasileiros. DADOS, Rio de Janeiro, vol.67 (2), p. 14, 2023."
+PATRI,PATRI,"8,55",Patriota ,51,DIREITA,D,,
+DEM,DEM,"8,57",Democratas,25,EXTREMA_DIREITA,EE,,

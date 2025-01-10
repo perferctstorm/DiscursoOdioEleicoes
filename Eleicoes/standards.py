@@ -183,14 +183,14 @@ def general_votting_line_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_co
   df_tmp_18:pl.DataFrame = filter_by_position(df_2018, position)
 
   df_tmp_18 = (df_tmp_18
-      .select(pl.col("ANO_ELEICAO", "SIGLA_2022","POSIC_IDEOLOGICO","QT_VOTOS_VALIDOS"))
-      .group_by(["ANO_ELEICAO", "SIGLA_2022","POSIC_IDEOLOGICO"], maintain_order=True)
+      .select(pl.col("ANO_ELEICAO", "SG_PARTIDO","POSIC_IDEOLOGICO","QT_VOTOS_VALIDOS"))
+      .group_by(["ANO_ELEICAO", "SG_PARTIDO","POSIC_IDEOLOGICO"], maintain_order=True)
       .agg(pl.col("QT_VOTOS_VALIDOS").sum())
       .with_columns(
           (pl.col("QT_VOTOS_VALIDOS")/pl.col("QT_VOTOS_VALIDOS").sum()).alias("PCT"),
           pl.col("QT_VOTOS_VALIDOS").sum().alias("QT_VOTOS_BR")
       )
-      .join(df_colors, left_on="SIGLA_2022", right_on="SG_PARTIDO", how="inner")
+      .join(df_colors, left_on="SG_PARTIDO", right_on="SG_PARTIDO", how="inner")
       .drop(["SG_POSIC_IDEOLOGICO","MEDIA_IDEOL"])
   )
 
@@ -198,26 +198,30 @@ def general_votting_line_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_co
   df_tmp_22:pl.DataFrame = filter_by_position(df_2022, position)
 
   df_tmp_22 = (df_tmp_22
-      .select(pl.col("ANO_ELEICAO", "SIGLA_2022","POSIC_IDEOLOGICO","QT_VOTOS_VALIDOS"))
-      .group_by(["ANO_ELEICAO", "SIGLA_2022","POSIC_IDEOLOGICO"], maintain_order=True)
+      .select(pl.col("ANO_ELEICAO", "SG_PARTIDO","POSIC_IDEOLOGICO","QT_VOTOS_VALIDOS"))
+      .group_by(["ANO_ELEICAO", "SG_PARTIDO","POSIC_IDEOLOGICO"], maintain_order=True)
       .agg(pl.col("QT_VOTOS_VALIDOS").sum())
       .with_columns(
           (pl.col("QT_VOTOS_VALIDOS")/pl.col("QT_VOTOS_VALIDOS").sum()).alias("PCT"),
           pl.col("QT_VOTOS_VALIDOS").sum().alias("QT_VOTOS_BR")
       )    
-      .join(df_colors, left_on="SIGLA_2022", right_on="SG_PARTIDO", how="inner")
+      .join(df_colors, left_on="SG_PARTIDO", right_on="SG_PARTIDO", how="inner")
       .drop(["SG_POSIC_IDEOLOGICO","MEDIA_IDEOL"])
   )
   # concatena as votações de 22 e 18 para os cargos em position
   df_tmp = pl.concat([df_tmp_22, df_tmp_18])
 
-  # os registros dos K partidos mais votados em 2018
-  top_k_22=df_tmp_22.top_k(total_parties, by="QT_VOTOS_VALIDOS").select(pl.col("SIGLA_2022","QT_VOTOS_VALIDOS"))
+  # os registros dos K partidos mais votados em 2022
+  df_partidos = pl.concat(
+      [df_tmp_18.top_k(total_parties, by="QT_VOTOS_VALIDOS").select(pl.col("SG_PARTIDO")),
+       df_tmp_22.top_k(total_parties, by="QT_VOTOS_VALIDOS").select(pl.col("SG_PARTIDO"))
+      ]
+  ).unique().to_list()
 
   # faz join entre com os 15 partidos mais votados em 22 usando o campo QT_ORDER
   # para ordenar o chart
   df_tmp = (df_tmp
-      .join(top_k_22, on="SIGLA_2022", how="inner")
+      .join(top_k_22, on="SG_PARTIDO", how="inner")
       .with_columns(
           QT_ORDER = pl.col("QT_VOTOS_VALIDOS_right")
       )
@@ -233,7 +237,7 @@ def general_votting_line_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_co
   )
 
   lines=base.encode(
-    x=alt.X('SIGLA_2022:N', title="", sort=alt.SortField(field="QT_ORDER")),
+    x=alt.X('SG_PARTIDO:N', title="", sort=alt.SortField(field="QT_ORDER")),
     y=alt.Y('PCT:Q', title="", axis=alt.Axis(format="%")),
     color=alt.Color(
         shorthand='ANO_ELEICAO:N', title="Eleição",
@@ -243,7 +247,7 @@ def general_votting_line_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_co
         )
     ),
     tooltip=[
-        alt.Tooltip('SIGLA_2022:N', title="Partido"),
+        alt.Tooltip('SG_PARTIDO:N', title="Partido"),
         alt.Tooltip('ANO_ELEICAO:O', title="Ano Eleição"),
         alt.Tooltip('QT_VOTOS_VALIDOS:Q', format=",d", title="Total Votos Partido"),
         alt.Tooltip('QT_VOTOS_BR:Q', format=",d",  title="Total de Votos"),
@@ -255,7 +259,7 @@ def general_votting_line_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_co
   )
   dotted_lines = (
     base.mark_line(opacity=0.8, strokeDash=[2,2], color="#F58518").encode(
-        alt.X("SIGLA_2022:O", sort=alt.SortField(field="QT_ORDER")),
+        alt.X("SG_PARTIDO:O", sort=alt.SortField(field="QT_ORDER")),
         alt.Y("min(PCT):Q"),
         alt.Y2("max(PCT):Q"),
     )
@@ -266,45 +270,45 @@ def general_votting_line_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_co
 '''
    Gera uma comparação da votação dos partido para um cargo entre 2018 e 2022 em forma de pirâmide
 '''
-def pyramid_votting_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_colors:pl.DataFrame,  
+def pyramid_votting_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_colors:pl.DataFrame,
                       position:list[int], chart_title:str, total_parties:int=10)->alt.vegalite.v5.api.Chart:
 
 
   # soma todos os votos por partidos de 2018
-  df_tmp_18:pl.DataFrame = filter_by_position(df_2018, list([1]))
+  df_tmp_18:pl.DataFrame = filter_by_position(df_2018, position)
 
   df_tmp_18 = (df_tmp_18
-      .select(pl.col("ANO_ELEICAO", "SIGLA_2022","POSIC_IDEOLOGICO","QT_VOTOS_VALIDOS"))
-      .group_by(["ANO_ELEICAO", "SIGLA_2022","POSIC_IDEOLOGICO"], maintain_order=True)
+      .select(pl.col("ANO_ELEICAO", "SG_PARTIDO","POSIC_IDEOLOGICO","QT_VOTOS_VALIDOS"))
+      .group_by(["ANO_ELEICAO", "SG_PARTIDO","POSIC_IDEOLOGICO"], maintain_order=True)
       .agg(pl.col("QT_VOTOS_VALIDOS").sum())
       .with_columns(
           (pl.col("QT_VOTOS_VALIDOS")/pl.col("QT_VOTOS_VALIDOS").sum()).alias("PCT"),
           pl.col("QT_VOTOS_VALIDOS").sum().alias("QT_VOTOS_BR")
       )
-      .join(df_colors, left_on="SIGLA_2022", right_on="SG_PARTIDO", how="inner")
+      .join(df_colors, left_on="SG_PARTIDO", right_on="SG_PARTIDO", how="inner")
       .drop(["SG_POSIC_IDEOLOGICO","MEDIA_IDEOL"])
   )
 
   # soma todos os votos por partidos de 2022
-  df_tmp_22:pl.DataFrame = filter_by_position(df_2022, list([1]))
+  df_tmp_22:pl.DataFrame = filter_by_position(df_2022, position)
 
   df_tmp_22 = (df_tmp_22
-      .select(pl.col("ANO_ELEICAO", "SIGLA_2022","POSIC_IDEOLOGICO","QT_VOTOS_VALIDOS"))
-      .group_by(["ANO_ELEICAO", "SIGLA_2022","POSIC_IDEOLOGICO"], maintain_order=True)
+      .select(pl.col("ANO_ELEICAO", "SG_PARTIDO","POSIC_IDEOLOGICO","QT_VOTOS_VALIDOS"))
+      .group_by(["ANO_ELEICAO", "SG_PARTIDO","POSIC_IDEOLOGICO"], maintain_order=True)
       .agg(pl.col("QT_VOTOS_VALIDOS").sum())
       .with_columns(
           (pl.col("QT_VOTOS_VALIDOS")/pl.col("QT_VOTOS_VALIDOS").sum()).alias("PCT"),
           pl.col("QT_VOTOS_VALIDOS").sum().alias("QT_VOTOS_BR")
-      )    
-      .join(df_colors, left_on="SIGLA_2022", right_on="SG_PARTIDO", how="inner")
+      )
+      .join(df_colors, left_on="SG_PARTIDO", right_on="SG_PARTIDO", how="inner")
       .drop(["SG_POSIC_IDEOLOGICO","MEDIA_IDEOL"])
   )
 
   # os registros dos K partidos mais votados em 2018
-  top_k_22=df_tmp_22.top_k(total_parties, by="QT_VOTOS_VALIDOS").select(pl.col("SIGLA_2022","QT_VOTOS_VALIDOS"))
+  top_k_22=df_tmp_22.top_k(total_parties, by="QT_VOTOS_VALIDOS").select(pl.col("SG_PARTIDO","QT_VOTOS_VALIDOS"))
 
   df_tmp_22 = (
-      df_tmp_22.join(top_k_22, on="SIGLA_2022", how="right")
+      df_tmp_22.join(top_k_22, on="SG_PARTIDO", how="right")
       .with_columns(
           QT_ORDER = pl.col("QT_VOTOS_VALIDOS_right")
       )
@@ -312,10 +316,10 @@ def pyramid_votting_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_colors:
       .with_columns(
           pl.col(["QT_VOTOS_VALIDOS","QT_VOTOS_BR","PCT"]).fill_null(strategy="zero"),
           pl.col("ANO_ELEICAO").fill_null(2022)
-      )  
+      )
   )
   df_tmp_18 = (
-      df_tmp_18.join(top_k_22, on="SIGLA_2022", how="right")
+      df_tmp_18.join(top_k_22, on="SG_PARTIDO", how="right")
       .with_columns(
           QT_ORDER = pl.col("QT_VOTOS_VALIDOS_right")
       )
@@ -331,7 +335,7 @@ def pyramid_votting_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_colors:
   df_tmp = pl.concat([df_tmp_22, df_tmp_18])
 
   base = alt.Chart(df_tmp).properties(
-      width=280
+      width=220
   )
 
   _domains = ["Extrema Esquerda","Esquerda","Centro Esquerda","Centro","Centro Direita","Direita","Extrema Direita"]
@@ -339,17 +343,17 @@ def pyramid_votting_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_colors:
   color_scale = alt.Scale(
       domain=_domains,
       range=_range
-  )   
+  )
 
   left_base = base.transform_filter(
       alt.datum.ANO_ELEICAO == 2018
   ).encode(
-      alt.Y('SIGLA_2022:O', sort=alt.SortField(field="QT_ORDER", order="descending")).axis(None),
+      alt.Y('SG_PARTIDO:O', sort=alt.SortField(field="QT_ORDER", order="descending")).axis(None),
       alt.Color('POSIC_IDEOLOGICO:O')
           .scale(color_scale)
           .legend(None),
       tooltip=[
-          alt.Tooltip("SIGLA_2022:N", title="Partido"),
+          alt.Tooltip("SG_PARTIDO:N", title="Partido"),
           alt.Tooltip("POSIC_IDEOLOGICO:N", title="Ideologia"),
           alt.Tooltip("ANO_ELEICAO:N", title="Eleição"),
           alt.Tooltip("QT_VOTOS_BR:Q", format=",d", title="Total Geral"),
@@ -358,21 +362,23 @@ def pyramid_votting_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_colors:
       ]
   ).mark_bar(opacity=.8).properties(title='2018')
 
+  max_pct = max(df_tmp_18.get_column("PCT").max()+.05, df_tmp_22.get_column("PCT").max()+.05)
+  #max_abs = np.ceil(df_tmp_18.get_column("QT_VOTOS_BR").max()/2)
+  #max_abs = np.ceil(df_tmp_22.get_column("QT_VOTOS_BR").max()/2)
+  max_abs = max(df_tmp_18.get_column("QT_VOTOS_BR").max(), df_tmp_22.get_column("QT_VOTOS_BR").max())
+
   left_pct = left_base.encode(
       alt.X('PCT:Q',
           title='',
-          axis=alt.Axis(values=np.arange(0,.55, .05), format="%", labelAngle=-90),
+          axis=alt.Axis(values=np.arange(0, 1.1, .1), format="%", labelAngle=-90),
           sort="descending",
-          scale=alt.Scale(domain=[0, .5])
+          scale=alt.Scale(domain=[0, max_pct])
       )
-  )
-
-  max_abs = np.ceil(df_tmp_18.get_column("QT_VOTOS_BR").max()/2)
+  )  
 
   left_abs = left_base.encode(
       alt.X('QT_VOTOS_VALIDOS:Q',
           title='',
-          #axis=alt.Axis(values=np.arange(0,.55, .05), format="%", labelAngle=-90),
           axis=alt.Axis(format="s", orient="top", labelAngle=-90),
           sort="descending",
           scale=alt.Scale(domain=[0, max_abs]),
@@ -381,33 +387,32 @@ def pyramid_votting_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_colors:
   )
 
   middle = base.encode(
-      alt.Y('SIGLA_2022:O', sort=alt.SortField(field="QT_ORDER", order="descending")).axis(None),
-      alt.Text('SIGLA_2022:O'),
+      alt.Y('SG_PARTIDO:O', sort=alt.SortField(field="QT_ORDER", order="descending")).axis(None),
+      alt.Text('SG_PARTIDO:O'),
   ).mark_text(fontSize=8.5).properties(width=30)
 
   right_base = base.transform_filter(
       alt.datum.ANO_ELEICAO == 2022
   ).encode(
-      alt.Y('SIGLA_2022:O', sort=alt.SortField(field="QT_ORDER", order="descending")).axis(None),
+      alt.Y('SG_PARTIDO:O', sort=alt.SortField(field="QT_ORDER", order="descending")).axis(None),
       alt.Color('POSIC_IDEOLOGICO:O').scale(color_scale),
       tooltip=[
-          alt.Tooltip("SIGLA_2022:N", title="Partido"),
-          alt.Tooltip("POSIC_IDEOLOGICO:N", title="Ideologia"),                    
+          alt.Tooltip("SG_PARTIDO:N", title="Partido"),
+          alt.Tooltip("POSIC_IDEOLOGICO:N", title="Ideologia"),
           alt.Tooltip("ANO_ELEICAO:N", title="Eleição"),
           alt.Tooltip("QT_VOTOS_BR:Q", format=",d", title="Total Geral"),
           alt.Tooltip("QT_VOTOS_VALIDOS:Q", format=",d", title="Votos Partido"),
           alt.Tooltip("PCT:Q", format=".2%", title="Percentual"),
-      ]  
+      ]
   ).mark_bar(opacity=0.8).properties(title='2022')
 
   right_pct = right_base.encode(
       alt.X('PCT:Q',
             title="",
-            axis=alt.Axis(values=np.arange(0,.55, .05), format="%", labelAngle=-90),
-            scale=alt.Scale(domain=[0, .5])
-      ),    
+            axis=alt.Axis(values=np.arange(0, 1.1, .1), format="%", labelAngle=-90),
+            scale=alt.Scale(domain=[0, max_pct])
+      ),
   )
-  max_abs = np.ceil(df_tmp_22.get_column("QT_VOTOS_BR").max()/2)
 
   right_abs = right_base.encode(
       alt.X('QT_VOTOS_VALIDOS:Q',
@@ -420,14 +425,13 @@ def pyramid_votting_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_colors:
   )
 
   return (
-    alt.concat(
+    alt.hconcat(
       alt.layer(left_pct,left_abs).resolve_scale(x='independent'),
-      middle, 
+      middle,
       alt.layer(right_pct,right_abs).resolve_scale(x='independent'),
-      spacing=2
+      spacing=2, title = alt.TitleParams(f"{chart_title}", anchor="middle")
     )
   )
-
 
 '''
 
@@ -438,32 +442,32 @@ def grouped_bar_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_colors:pl.D
     df_tmp_18 = filter_by_position(df_2018, position)
     
     df_tmp_18 = (df_tmp_18
-        .select(pl.col("ANO_ELEICAO", "SIGLA_2022","SG_POSIC_IDEOLOGICO","QT_VOTOS_VALIDOS"))
-        .group_by(["ANO_ELEICAO", "SIGLA_2022","SG_POSIC_IDEOLOGICO"], maintain_order=True)
+        .select(pl.col("ANO_ELEICAO", "SG_PARTIDO","SG_POSIC_IDEOLOGICO","QT_VOTOS_VALIDOS"))
+        .group_by(["ANO_ELEICAO", "SG_PARTIDO","SG_POSIC_IDEOLOGICO"], maintain_order=True)
         .agg(pl.col("QT_VOTOS_VALIDOS").sum())
-        .join(df_colors, left_on="SIGLA_2022", right_on="SG_PARTIDO", how="inner")
+        .join(df_colors, left_on="SG_PARTIDO", right_on="SG_PARTIDO", how="inner")
     )
     
     # soma todos os votos por partidos de 2022
     df_tmp_22 = filter_by_position(df_2022, position)
     
     df_tmp_22 = (df_tmp_22
-        .select(pl.col("ANO_ELEICAO", "SIGLA_2022","SG_POSIC_IDEOLOGICO","QT_VOTOS_VALIDOS"))
-        .group_by(["ANO_ELEICAO", "SIGLA_2022","SG_POSIC_IDEOLOGICO"], maintain_order=True)
+        .select(pl.col("ANO_ELEICAO", "SG_PARTIDO","SG_POSIC_IDEOLOGICO","QT_VOTOS_VALIDOS"))
+        .group_by(["ANO_ELEICAO", "SG_PARTIDO","SG_POSIC_IDEOLOGICO"], maintain_order=True)
         .agg(pl.col("QT_VOTOS_VALIDOS").sum())
-        .join(df_colors, left_on="SIGLA_2022", right_on="SG_PARTIDO", how="inner")
+        .join(df_colors, left_on="SG_PARTIDO", right_on="SG_PARTIDO", how="inner")
     )
     
     # concatena as votações de 22 e 18 para os cargos em position
     df_tmp = pl.concat([df_tmp_22, df_tmp_18])
     
     # os registros dos K partidos mais votados em 2018
-    top_k_22=df_tmp_22.top_k(total_parties, by="QT_VOTOS_VALIDOS").select(pl.col("SIGLA_2022","QT_VOTOS_VALIDOS"))    
+    top_k_22=df_tmp_22.top_k(total_parties, by="QT_VOTOS_VALIDOS").select(pl.col("SG_PARTIDO","QT_VOTOS_VALIDOS"))    
     
     # faz join entre com os 15 partidos mais votados em 22 usando o campo QT_ORDER 
     # para ordenar o chart
     df_tmp = (df_tmp
-        .join(top_k_22, on="SIGLA_2022", how="inner")
+        .join(top_k_22, on="SG_PARTIDO", how="inner")
         .with_columns(
             QT_ORDER = pl.col("QT_VOTOS_VALIDOS_right")
         )
@@ -482,7 +486,7 @@ def grouped_bar_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_colors:pl.D
             ),
             legend=None
         ),
-        row = alt.Row('SIGLA_2022:N',
+        row = alt.Row('SG_PARTIDO:N',
             title="",
             spacing = 5,
             header=alt.Header(labelAngle=0, labelAlign='left', title=f'{chart_title}', titleFontSize=12),
@@ -490,7 +494,7 @@ def grouped_bar_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_colors:pl.D
         ),
         opacity=alt.OpacityValue(0.75),
         tooltip=[
-            alt.Tooltip('SIGLA_2022:N', title="Partido"),
+            alt.Tooltip('SG_PARTIDO:N', title="Partido"),
             alt.Tooltip('ANO_ELEICAO:O', title="Ano Eleição"),
             alt.Tooltip('QT_VOTOS_VALIDOS:Q', format=",d",  title="Votos"),
         ]        
@@ -618,7 +622,7 @@ def choropleth_diff_votting(df_poll_diff:pl.DataFrame, df_capitais:pl.DataFrame,
           legend=alt.Legend(
             #orient="bottom",
             titleAnchor='middle',
-            title="Diferença Perc. de Votos",
+            title="Diferença Perc. de Votos [2022-2018]",
             #direction="horizontal"
             type="symbol",
             symbolSize=400,
@@ -681,7 +685,7 @@ def filter_choropleth_votting(
   cargo:list[int], partidos:list[str])->alt.vegalite.v5.api.Chart:
     df_poll_18_tmp=(df_2018
             .filter( pl.col("CD_CARGO").is_in( cargo ) )
-            .group_by("ANO_ELEICAO", "SIGLA_2022", "NM_REGIAO", "CD_MUNICIPIO")
+            .group_by("ANO_ELEICAO", "SG_PARTIDO", "NM_REGIAO", "CD_MUNICIPIO")
             .agg(pl.col("QT_VOTOS_VALIDOS").sum())                    
             .with_columns(
                 (pl.col("QT_VOTOS_VALIDOS") / pl.sum("QT_VOTOS_VALIDOS").over("CD_MUNICIPIO")).alias("PCT_VOTOS_MUNIC"),
@@ -689,12 +693,12 @@ def filter_choropleth_votting(
             )
             .join(df_municipios, left_on="CD_MUNICIPIO", right_on="codigo_tse", how="inner")
             .drop(pl.col(["capital","ddd"]))            
-            .filter((pl.col("SIGLA_2022").is_in(partidos)))
+            .filter((pl.col("SG_PARTIDO").is_in(partidos)))
         )   
     
     df_poll_22_tmp=(df_2022
             .filter( pl.col("CD_CARGO").is_in( cargo ) )
-            .group_by("ANO_ELEICAO", "SIGLA_2022", "NM_REGIAO", "CD_MUNICIPIO")
+            .group_by("ANO_ELEICAO", "SG_PARTIDO", "NM_REGIAO", "CD_MUNICIPIO")
             .agg(pl.col("QT_VOTOS_VALIDOS").sum())                    
             .with_columns(
                 (pl.col("QT_VOTOS_VALIDOS") / pl.sum("QT_VOTOS_VALIDOS").over("CD_MUNICIPIO")).alias("PCT_VOTOS_MUNIC"),
@@ -702,7 +706,7 @@ def filter_choropleth_votting(
             )
             .join(df_municipios, left_on="CD_MUNICIPIO", right_on="codigo_tse", how="inner")
             .drop(pl.col(["capital","ddd"]))            
-            .filter((pl.col("SIGLA_2022").is_in(partidos)))
+            .filter((pl.col("SG_PARTIDO").is_in(partidos)))
         )  
     return df_poll_18_tmp, df_poll_22_tmp
 
@@ -757,7 +761,7 @@ def box_plots_votting_by_uf(df:pl.DataFrame,
       )
   )
 
-  groupby = ["ANO_ELEICAO", "NM_REGIAO", "uf", "SIGLA_2022"]
+  groupby = ["ANO_ELEICAO", "NM_REGIAO", "uf", "SG_PARTIDO"]
   if group_ideolog:
     groupby.append("NOME_RES_IDEOLOGICO")
 
@@ -873,7 +877,7 @@ def box_plots_votting_by_region(
           q1="q1(PCT_VOTOS_MUNIC):Q",
           q3="q3(PCT_VOTOS_MUNIC):Q",
           count="count()",
-          groupby=["ANO_ELEICAO", "SIGLA_2022",f"{color_column}"]
+          groupby=["ANO_ELEICAO", "SG_PARTIDO",f"{color_column}"]
       ).mark_bar(opacity=.0, yOffset=3, y2Offset=-3)
       .encode(        
           y=alt.Y('q1:Q').scale(zero=False, nice=True),
@@ -917,7 +921,7 @@ def scatter_votting_by_regions(
           alt.value(color_range[1])
     )
   else:
-    color = alt.Color("SIGLA_2022:N", legend=None, scale=alt.Scale(scheme=scheme))
+    color = alt.Color("SG_PARTIDO:N", legend=None, scale=alt.Scale(scheme=scheme))
 
   scatter_plot = (
       alt.Chart()
@@ -1061,7 +1065,7 @@ def scatter_votting_by_regions(
   alt.layer(scatter_plot, line_plot, won_22, won_18, median_pct_22, median_pct_18, median_diff, box, data=df_tmp)
       .facet(
           column = alt.Column("NM_REGIAO:N", title="", sort=alt.SortField("NM_REGIAO")),
-          row=alt.Row(shorthand='SIGLA_2022:N', header=None, title=""),
+          row=alt.Row(shorthand='SG_PARTIDO:N', header=None, title=""),
           center=True
       )
   ).properties(
@@ -1323,7 +1327,7 @@ def kde_plot(df:pl.DataFrame, groupby:list[str]=['ANO_ELEICAO', 'NM_REGIAO'],
       'PCT_VOTOS_MUNIC',
       as_=['PCT_VOTOS_MUNIC', 'density'],
       groupby=groupby,
-      #groupby=['NM_REGIAO','SIGLA_2022'],
+      #groupby=['NM_REGIAO','SG_PARTIDO'],
       #extent=[-.001, .3]
     ).mark_area(opacity=.6).encode(
       x=alt.X(
@@ -1335,7 +1339,7 @@ def kde_plot(df:pl.DataFrame, groupby:list[str]=['ANO_ELEICAO', 'NM_REGIAO'],
       ),
       y=alt.Y('density:Q', title="").stack(None),
       color=alt.Color(f"{color_column}:N", scale=scale, title=f"{legend_title}")
-      #color=alt.Color("SIGLA_2022:N", scale=scale, title='Partido')
+      #color=alt.Color("SG_PARTIDO:N", scale=scale, title='Partido')
     ).facet(
       alt.Column("NM_REGIAO:N", title=""), columns=num_cols
     ).configure_axisX(
@@ -1352,7 +1356,7 @@ def perc_votting_by_city(
   df_municipios:pl.DataFrame,
   breaks=list[float], 
   domain=list[str], cargo:list[str]=[],
-  group_by_cols:list[str]=["ANO_ELEICAO", "SIGLA_2022", "NM_REGIAO", "CD_MUNICIPIO"])->pl.DataFrame:
+  group_by_cols:list[str]=["ANO_ELEICAO", "SG_PARTIDO", "NM_REGIAO", "CD_MUNICIPIO"])->pl.DataFrame:
     df_poll_18_tmp=(df_18
             .filter( pl.col("CD_CARGO").is_in( cargo ) )
             .group_by(group_by_cols)
@@ -1364,7 +1368,7 @@ def perc_votting_by_city(
             )
             .join(df_municipios, left_on="CD_MUNICIPIO", right_on="codigo_tse", how="inner")
             .drop(pl.col(["capital","ddd"]))            
-            #.filter((pl.col("SIGLA_2022").is_in(partidos)))
+            #.filter((pl.col("SG_PARTIDO").is_in(partidos)))
         )   
 
     df_poll_22_tmp=(df_22
@@ -1378,7 +1382,7 @@ def perc_votting_by_city(
             )
             .join(df_municipios, left_on="CD_MUNICIPIO", right_on="codigo_tse", how="inner")
             .drop(pl.col(["capital","ddd"]))            
-            #.filter((pl.col("SIGLA_2022").is_in(partidos)))
+            #.filter((pl.col("SG_PARTIDO").is_in(partidos)))
         )  
 
     df_poll_18_tmp = df_poll_18_tmp.with_columns(
@@ -1395,7 +1399,7 @@ def set_region_agg_for_choro(df:pl.DataFrame, partidos:list[str]=[], eleicoes:li
                              tipo:str="B", breaks=list[float], domain=list[str]):
   df_tmp = df
   if partidos:
-    df_tmp = df_tmp.filter(pl.col("SIGLA_2022").is_in(partidos))
+    df_tmp = df_tmp.filter(pl.col("SG_PARTIDO").is_in(partidos))
   if eleicoes:
     df_tmp = df_tmp.filter(pl.col("ANO_ELEICAO").is_in(eleicoes))
 
@@ -1404,7 +1408,7 @@ def set_region_agg_for_choro(df:pl.DataFrame, partidos:list[str]=[], eleicoes:li
       .agg(pl.col("QT_VOTOS_VALIDOS").sum())
       .with_columns(
         pl.lit(tipo).alias("TIPO"),
-        pl.lit(partidos[0]).alias("SIGLA_2022"), pl.lit(0).cast(pl.Int64).alias("CD_MUNICIPIO"),
+        pl.lit(partidos[0]).alias("SG_PARTIDO"), pl.lit(0).cast(pl.Int64).alias("CD_MUNICIPIO"),
         pl.lit(0).cast(pl.Float64).alias("PCT_VOTOS_MUNIC"), pl.lit(0).cast(pl.Int64).alias("TOTAL_VOTOS_MUNIC"),
         pl.lit(0).cast(pl.Int64).alias("codigo_ibge"), pl.lit("").alias("nome"), pl.lit("").alias("uf"),
         pl.lit(0).cast(pl.Float64).alias("latitude"),pl.lit(0).cast(pl.Float64).alias("longitude"),
@@ -1570,7 +1574,7 @@ def votes_by_region(df:pl.DataFrame, partido:str="", eleicao:int=2018,
                         breaks=list[float], domain=list[str]):
   df_tmp = df
   if partido:
-    df_tmp = df_tmp.filter(pl.col("SIGLA_2022")==partido)
+    df_tmp = df_tmp.filter(pl.col("SG_PARTIDO")==partido)
   if eleicao:
     df_tmp = df_tmp.filter(pl.col("ANO_ELEICAO").is_in(eleicao))
   if res_ideologico:
@@ -1581,7 +1585,7 @@ def votes_by_region(df:pl.DataFrame, partido:str="", eleicao:int=2018,
       .agg(pl.col("QT_VOTOS_VALIDOS").sum())
       .with_columns(
         pl.lit(tipo).alias("TIPO"),
-        pl.lit(partido).alias("SIGLA_2022"), pl.lit(0).cast(pl.Int64).alias("CD_MUNICIPIO"),
+        pl.lit(partido).alias("SG_PARTIDO"), pl.lit(0).cast(pl.Int64).alias("CD_MUNICIPIO"),
         pl.lit(res_ideologico).alias("NOME_RES_IDEOLOGICO"),
         pl.lit(0).cast(pl.Float64).alias("PCT_VOTOS_MUNIC"), pl.lit(0).cast(pl.Int64).alias("TOTAL_VOTOS_MUNIC"),
         pl.lit(0).cast(pl.Int64).alias("codigo_ibge"), pl.lit("").alias("nome"), pl.lit("").alias("uf"),
