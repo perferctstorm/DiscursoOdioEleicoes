@@ -1,22 +1,16 @@
+#######################
+# Import libraries
 import streamlit as st
 import altair as alt
+import plotly.express as px
 import polars as pl
 import numpy as np
-import sys
-# adding Folder_2 to the system path
-sys.path.insert(0, '../Eleicoes/')
-
-import standards as sdt_f
-
-##########################################################################################
-##                               Lista de variáveis a usar                              ##
-##########################################################################################
 
 ##########################################################################################
 ##                                       Layout                                         ##
 ##########################################################################################
 st.set_page_config(
-    page_title="Desmistificando 2022",
+    page_title="Dashboard Eleições",
     layout="wide",
     initial_sidebar_state="expanded",
     page_icon = "🗳️"
@@ -72,8 +66,8 @@ def get_capitais():
 regions_list = list(get_regioes().get_column("NM_REGIAO").unique().sort().to_list()) #apenas as grandes regiões brasileiras
 
 #lista dos partidos que chegram ao 2o turno em 2018 e 2022
-partidos_18:list[str] = ["PT","PSL"]
-partidos_22:list[str] = ["PT","PL"]
+#partidos_18:list[str] = ["PT","PSL"]
+#partidos_22:list[str] = ["PT","PL"]
 
 #dados das eleições
 df_poll_18:pl.DataFrame = get_eleicao_18()
@@ -117,39 +111,68 @@ for regiao in regioes:
 ##########################################################################################
 ##                                       Funções                                        ##
 ##########################################################################################
+def mapas_votacao(partido:str, eleicao:int, df:pl.DataFrame, df_municipios:pl.DataFrame, 
+                     df_capitais:pl.DataFrame)->alt.vegalite.v5.api.Chart:
+    breaks:list[int] = list([.25, .4, .55])
+    domain:list[str] = list(["<=25%", ">25%,<=40%", ">40%,<=55%",">55%"])
+    
+    df_tmp = sdt_f.perc_votting_by_partie(
+        df, df_municipios=df_municipios, cargo=list([1]),
+        breaks=breaks, domain=domain
+    )    
+    df_tmp = df_tmp.filter( pl.col("SG_PARTIDO").is_in([partido]) & (pl.col("ANO_ELEICAO")==eleicao))
 
-def mapas_diferancas(df_poll_18:pl.DataFrame,
-                     df_poll_22:pl.DataFrame,
+    return sdt_f.choropleth_votting(df_tmp, df_capitais=df_capitais,
+                             chart_title="", scaleDomain=domain,
+                              legend_sort=domain[::-1],
+                              facet_column="ANO_ELEICAO"
+        ).configure_legend(
+            orient="left",
+            titleColor="#000",
+            labelColor="#000",
+            titleFontSize=12,
+            labelFontSize=10,
+            offset=-150,
+        ).properties(
+            title=f"{partido} {eleicao}"
+        ).configure_title(
+            anchor="middle"
+        )
+
+def mapas_diferancas(df_poll_a:pl.DataFrame,
+                     df_poll_b:pl.DataFrame,
                      df_municipios:pl.DataFrame, 
                      df_capitais:pl.DataFrame, 
                      cargo:list[int], titulo:str='', 
-                     partido_18:str='', 
-                     partido_22:str='',
+                     partido_a:str='', 
+                     partido_b:str='',
+                     eleicao_a:int=2018,
+                     eleicao_b:int=2022,
                      regioes:list[str]=[])->alt.vegalite.v5.api.Chart:    
     breaks = [-.1, -.01, .01, .1]
     domain=["<-10%", ">-10% e <=-1%", ">-1%,<=1%",">1% e <=10%", ">10%"]
 
     if regioes:
-        df_poll_18 = df_poll_18.filter(pl.col("NM_REGIAO").is_in(regioes))
-        df_poll_22 = df_poll_22.filter(pl.col("NM_REGIAO").is_in(regioes))
+        df_poll_a = df_poll_a.filter(pl.col("NM_REGIAO").is_in(regioes))
+        df_poll_b = df_poll_b.filter(pl.col("NM_REGIAO").is_in(regioes))
     
     #todos os votos para os cargos específicos
     df_tmp = sdt_f.perc_votting_by_city(
-        df_poll_18, df_poll_22, df_municipios=df_municipios, cargo=cargo,
+        df_poll_a, df_poll_b, df_municipios=df_municipios, cargo=cargo,
         breaks=breaks, domain=domain
     )
     
     #votos por municípios para cada partido para o choropleth
     df_tmp_choroplet = pl.concat(
-        [df_tmp.filter( pl.col("SG_PARTIDO").is_in([f"{partido_18}"]) & (pl.col("ANO_ELEICAO")==2018)),
-         df_tmp.filter( pl.col("SG_PARTIDO").is_in([f"{partido_22}"]) & (pl.col("ANO_ELEICAO")==2022))
+        [df_tmp.filter( pl.col("SG_PARTIDO").is_in([f"{partido_a}"]) & (pl.col("ANO_ELEICAO")==eleicao_a)),
+         df_tmp.filter( pl.col("SG_PARTIDO").is_in([f"{partido_b}"]) & (pl.col("ANO_ELEICAO")==eleicao_b))
         ]
     )    
     
-    df_poll_pt18_tmp = df_tmp_choroplet.filter( (pl.col("ANO_ELEICAO")==2018) & (pl.col("SG_PARTIDO")==f"{partido_18}" ) )
-    df_poll_pt22_tmp = df_tmp_choroplet.filter( (pl.col("ANO_ELEICAO")==2022) & (pl.col("SG_PARTIDO")==f"{partido_22}" ) )
+    df_poll_pta_tmp = df_tmp_choroplet.filter( (pl.col("ANO_ELEICAO")==eleicao_a) & (pl.col("SG_PARTIDO")==f"{partido_a}" ) )
+    df_poll_ptb_tmp = df_tmp_choroplet.filter( (pl.col("ANO_ELEICAO")==eleicao_b) & (pl.col("SG_PARTIDO")==f"{partido_b}" ) )
     
-    df_poll_pt18_diff = df_poll_pt18_tmp.select([
+    df_poll_pta_diff = df_poll_pta_tmp.select([
         "CD_MUNICIPIO",
         "QT_VOTOS_VALIDOS",
         "TOTAL_VOTOS_MUNIC",
@@ -160,7 +183,7 @@ def mapas_diferancas(df_poll_18:pl.DataFrame,
         "PCT_VOTOS_MUNIC":"PCT_VOTOS_MUNIC_18"
     })
     
-    df_poll_pt22_diff = df_poll_pt22_tmp.select(
+    df_poll_ptb_diff = df_poll_ptb_tmp.select(
         ["uf", "codigo_ibge", "nome", "CD_MUNICIPIO","QT_VOTOS_VALIDOS", "TOTAL_VOTOS_MUNIC","PCT_VOTOS_MUNIC"]
     ).rename({
         "TOTAL_VOTOS_MUNIC":"TOTAL_VOTOS_MUNIC_22",
@@ -170,8 +193,8 @@ def mapas_diferancas(df_poll_18:pl.DataFrame,
     
     #Diferença percentual de votos entre os dois anos
     df_poll_diff = (
-      df_poll_pt18_diff
-      .join(df_poll_pt22_diff, on="CD_MUNICIPIO", how="inner")
+      df_poll_pta_diff
+      .join(df_poll_ptb_diff, on="CD_MUNICIPIO", how="inner")
       .with_columns(
           (pl.col("PCT_VOTOS_MUNIC_22")-pl.col("PCT_VOTOS_MUNIC_18")).alias("PCT_DIFF"),
           (pl.col("QT_VOTOS_VALIDOS_22")-pl.col("QT_VOTOS_VALIDOS_18")).alias("QT_DIFF")
@@ -182,30 +205,51 @@ def mapas_diferancas(df_poll_18:pl.DataFrame,
         pl.col("PCT_DIFF").cut(breaks, labels=domain).alias("PCT_VOTOS_LIMIT")
     )
     
+    scheme = "inferno"
+    rev_Schmeme = False
+    if (partido_a in ["PT"] and partido_b in ["PSL","PL"]):
+        scheme = "redyellowblue"
+
+    if (partido_b in ["PT"] and partido_a in ["PSL","PL"]):
+        scheme = "redyellowblue"
+        rev_Schmeme = True
+
     return sdt_f.choropleth_diff_votting(
         df_poll_diff, df_capitais,
         scaleDomain=domain,
         chart_title=titulo,
         legend_sort=domain[::-1],
-        tooltip_title_22=["Total Votos Munic. 2022",f"Tot Votos {partido_22} 2022", f"Perc. Votos {partido_22} 2022"],
-        tooltip_title_18=["Total Votos Munic. 2018",f"Tot Votos {partido_18} 2018", f"Perc. Votos {partido_18} 2018"]
+        opacity=.8,
+        scheme=scheme,
+        rev_Schmeme=rev_Schmeme,
+        tooltip_title_22=[f"Total Votos Munic. {eleicao_b}",f"Tot Votos {partido_b} {eleicao_b}", f"Perc. Votos {partido_b} {eleicao_b}"],
+        tooltip_title_18=[f"Total Votos Munic. {eleicao_a}",f"Tot Votos {partido_a} {eleicao_a}", f"Perc. Votos {partido_a} {eleicao_a}"],
+        legend_title=f'{partido_b} {eleicao_b} - {partido_a} {eleicao_a}'
     ).configure_legend(
-        orient="top",
+        orient="left",
         titleColor="#000",
         labelColor="#000",
         titleFontSize=12,
         labelFontSize=10,
-        offset=-10,
+        offset=-150,
     )    
 
 ##########################################################################################
 ##                                     Apresentação                                     ##
 ##########################################################################################
+cruzamentos:list[str] = ["PT 2022 x PL 2022", "PT 2022 x PSL 2018", "PT 2022 x PT 2018", 
+                        "PL 2022 x PSL 2018", "PL 2022 x PT 2018", "PT 2018 x PSL 2018"]
+
 with st.sidebar:
     st.markdown("# Selecione os Filtros da Aplicação ✔️")    
     regioes = st.multiselect('Regiões', regions_list, default=regions_list)
-    partido_18 = st.radio("Escolha o Partido de 2018", partidos_18, horizontal=True)
-    partido_22 = st.radio('Escolha o Partido de 2022', partidos_22, horizontal=True)
+    disputa = st.radio("Escolha o Cruzamento", cruzamentos, horizontal=False)
+    #divide os dados relativos à escolha do cruzamento
+    disputa_arr = disputa.split(" ")
+    partido_b = disputa_arr[0]
+    eleicao_b = np.int16( disputa_arr[1] )
+    partido_a = disputa_arr[3]
+    eleicao_a =np.int16( disputa_arr[4] )
 
 st.title("Desmistificando 2022") 
 
@@ -222,7 +266,7 @@ with tabGeral:
     with linha[0]:
         st.markdown("Classificação Ideológica dos Partidos Políticos Brasileiros", unsafe_allow_html=True)
         st.altair_chart(
-            sdt_f.class_ideologica_chart(df_partidos, df_colors).properties(height=200, title=""), 
+            sdt_f.class_ideologica_chart(df_partidos, df_colors).properties(height=220, title=""), 
             use_container_width=True
         )
         
@@ -269,15 +313,28 @@ with tabGeral:
         )
         
 with tabMapas:
-    linha = st.columns(1)
+    df_poll_a:pl.DataFrame=df_poll_18 if eleicao_a==2018 else df_poll_22
+    df_poll_b:pl.DataFrame=df_poll_18 if eleicao_b==2018 else df_poll_22        
+    
+    linha = st.columns([2,1,2])
     with linha[0]:
         st.altair_chart(
-            mapas_diferancas(df_poll_18 = df_poll_18, 
-                               df_poll_22 = df_poll_22, 
-                               df_municipios = df_municipios, 
-                               df_capitais = df_capitais, 
-                               cargo=list([1]), titulo='', 
-                               partido_18 = partido_18, 
-                               partido_22 = partido_22,
-                               regioes=regioes)
+            mapas_votacao(partido=partido_b, 
+                          eleicao=eleicao_b, 
+                          df=df_poll_b,
+                          df_municipios = df_municipios, 
+                          df_capitais = df_capitais,)
+        )
+    with linha[2]:
+        st.altair_chart(
+            mapas_diferancas(df_poll_a=df_poll_a,
+                     df_poll_b=df_poll_b,
+                     df_municipios = df_municipios, 
+                     df_capitais = df_capitais, 
+                     cargo=list([1]), titulo=f'{disputa}',
+                     partido_a=partido_a, 
+                     partido_b=partido_b,
+                     eleicao_a=eleicao_a,
+                     eleicao_b=eleicao_b,
+                     regioes=regioes)
         )
