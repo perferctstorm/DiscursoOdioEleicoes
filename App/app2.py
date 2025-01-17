@@ -175,8 +175,228 @@ def parties_colors(df:pl.DataFrame)->pl.DataFrame:
     )
 )
 
+## Mapas
 
-##  Resumo dos mapas 
+## renderiza uma mapa com a votação do partido
+
+def mapa_eleitoral(df_eleicao:pl.DataFrame, 
+                   df_municipios:pl.DataFrame,
+                   df_capitais:pl.DataFrame,
+                   partido:str="", 
+                   breaks=list[float], 
+                   domain=list[str],
+                   scheme:str="inferno",
+                   legend_sort:list[str]=[],
+                   opacity=1.,
+                   rev_Schmeme:bool=False)->alt.vegalite.v5.api.Chart:
+
+    df_choropleth = (
+        df_eleicao
+        .filter(pl.col("SG_PARTIDO")==f"{partido}")
+        .select(["CD_MUNICIPIO","TOTAL_VOTOS_MUNIC","QT_VOTOS_VALIDOS","PCT_VOTOS_MUNIC"])        
+    )
+    df_choropleth = (
+        df_choropleth
+        .with_columns(
+            pl.col("PCT_VOTOS_MUNIC").cut(breaks=[.25, .4, .55], labels=["<=25%", ">25%,<=40%", ">40%,<=55%",">55%"]).alias("PCT_VOTOS_LIMIT")
+        )
+    )
+    df_choropleth = (
+        df_choropleth
+        .join(df_municipios, left_on="CD_MUNICIPIO", right_on="codigo_tse", how="inner")
+        .drop(pl.col(["capital","ddd"])) 
+    )    
+    scale = alt.Scale(type="threshold", reverse=rev_Schmeme, domain=domain, scheme=scheme)    
+
+    states = alt.Data(
+      url='https://raw.githubusercontent.com/perferctstorm/DiscursoOdioEleicoes/refs/heads/main/Dados/Eleicoes/br_states.json',
+      format=alt.DataFormat(property='features')
+    )
+    background_states:alt.vegalite.v5.api.Chart = (
+      alt.Chart(alt.Data(states))
+      .mark_geoshape(
+          stroke='#000',
+          fillOpacity = 0,
+          strokeWidth=.6
+      )
+    )
+    
+    cities = alt.Data(
+      url="https://raw.githubusercontent.com/perferctstorm/DiscursoOdioEleicoes/refs/heads/main/Dados/Eleicoes/geojs-100-mun_minifier.json",
+      format=alt.DataFormat(property='features')
+    )
+    
+    cities_map = alt.Chart(df_choropleth) \
+    .mark_geoshape(
+        stroke="#000", strokeWidth=.03, fillOpacity=opacity
+    ).project(
+        type="equirectangular"
+    ).encode(
+      shape='geo:G',
+      color=alt.Color("PCT_VOTOS_LIMIT:N",
+          scale=scale,
+          legend=alt.Legend(
+            #orient="bottom",
+            titleAnchor='middle',
+            title="Percentual de Votos",
+            #direction="horizontal"
+            type="symbol",
+            symbolSize=400,
+            #symbolOpacity=.7,
+            symbolStrokeWidth=0,
+            symbolType="square",
+            values=legend_sort
+          )
+      ),
+      tooltip=[
+          alt.Tooltip('uf:N', title='Estado'),
+          alt.Tooltip('nome:N', title="Município"),
+          alt.Tooltip("TOTAL_VOTOS_MUNIC:Q", format=",d", title="Votos Totais Município"),
+          alt.Tooltip("QT_VOTOS_VALIDOS:Q",format=",d", title="Votos no Partido"),
+          alt.Tooltip("PCT_VOTOS_MUNIC:Q", format=".2%", title="% Votos"),
+      ]
+    ).transform_lookup(
+      lookup='codigo_ibge',
+      from_=alt.LookupData(cities, key="properties.id"),
+      as_='geo'
+    ).properties(width=600)
+    
+    return alt.layer(background_states, cities_map), df_choropleth
+
+
+
+## Plota as diferenças de votos percentuais entre dois anos
+def prepara_mapa_diferenca(
+        df_choropleth_a:pl.DataFrame, 
+        df_choropleth_b:pl.DataFrame, 
+        df_capitais:pl.DataFrame, 
+        breaks = [],
+        domain=[], 
+        chart_title:str="", 
+        legend_sort:list[str]=[],
+        scheme="inferno", 
+        rev_Schmeme:bool=False,
+        opacity=1., 
+        tooltip_title_22:list[str]=[], 
+        tooltip_title_18:list[str]=[],
+        legend_title:str='')->alt.vegalite.v5.api.Chart:
+
+    df_choropleth_diff_a = (
+        df_choropleth_a.rename({
+            "TOTAL_VOTOS_MUNIC":"TOTAL_VOTOS_MUNIC_18",
+            "QT_VOTOS_VALIDOS":"QT_VOTOS_VALIDOS_18",
+            "PCT_VOTOS_MUNIC":"PCT_VOTOS_MUNIC_18"
+        }).drop(["codigo_ibge", "nome",	"uf", "latitude","longitude"])
+    )
+    
+    df_choropleth_diff_b=df_choropleth_b.rename({
+        "TOTAL_VOTOS_MUNIC":"TOTAL_VOTOS_MUNIC_22",
+        "QT_VOTOS_VALIDOS":"QT_VOTOS_VALIDOS_22",
+        "PCT_VOTOS_MUNIC":"PCT_VOTOS_MUNIC_22"
+    })  
+
+    df_choropleth_diff = (
+      df_choropleth_diff_a
+      .join(df_choropleth_diff_b, on="CD_MUNICIPIO", how="inner")
+      .with_columns(
+          (pl.col("PCT_VOTOS_MUNIC_22")-pl.col("PCT_VOTOS_MUNIC_18")).alias("PCT_DIFF"),
+          (pl.col("QT_VOTOS_VALIDOS_22")-pl.col("QT_VOTOS_VALIDOS_18")).alias("QT_DIFF")
+      ).with_columns(
+        pl.col("PCT_DIFF").cut(breaks, labels=domain).alias("PCT_VOTOS_LIMIT")
+      )
+    )
+
+    return mapa_diferenca(
+        df_poll_diff=df_choropleth_diff, 
+        df_capitais=df_capitais,
+        scaleDomain=domain,
+        legend_sort=legend_sort,
+        rev_Schmeme=rev_Schmeme,
+        legend_title=legend_title,
+        opacity=opacity,
+        tooltip_title_22=tooltip_title_22,
+        tooltip_title_18=tooltip_title_18
+    )
+    
+def mapa_diferenca(
+    df_poll_diff:pl.DataFrame, 
+    df_capitais:pl.DataFrame, 
+    chart_title:str="", 
+    scaleDomain:list[str]=[], 
+    legend_sort:list[str]=[],
+    scheme="inferno", 
+    rev_Schmeme:bool=False,
+    opacity=1., 
+    tooltip_title_22:list[str]=[], 
+    tooltip_title_18:list[str]=[],
+    legend_title:str='')->alt.vegalite.v5.api.Chart:
+
+  scale = alt.Scale(type="threshold", reverse=rev_Schmeme, domain=scaleDomain, scheme=scheme)
+
+  states = alt.Data(
+      url='https://raw.githubusercontent.com/perferctstorm/DiscursoOdioEleicoes/refs/heads/main/Dados/Eleicoes/br_states.json',
+      format=alt.DataFormat(property='features')
+  )
+  background_states:alt.vegalite.v5.api.Chart = (
+      alt.Chart(alt.Data(states))
+      .mark_geoshape(
+          stroke='#000',
+          fillOpacity=0,
+          strokeWidth=.6
+      )
+  )
+
+  cities = alt.Data(
+      url="https://raw.githubusercontent.com/perferctstorm/DiscursoOdioEleicoes/refs/heads/main/Dados/Eleicoes/geojs-100-mun_minifier.json",
+      format=alt.DataFormat(property='features')
+  )
+
+  cities_map =(alt.Chart(df_poll_diff)
+    .mark_geoshape(
+        stroke="#000", strokeWidth=.03, fillOpacity=opacity
+    ).project(
+        type="equirectangular"
+    ).encode(
+      shape='geo:G',
+      color=alt.Color("PCT_VOTOS_LIMIT:N",
+          scale=scale,
+          legend=alt.Legend(
+            titleAnchor='middle',
+            title=f"{legend_title}",
+            type="symbol",
+            symbolSize=400,
+            #symbolOpacity=.8,
+            symbolStrokeWidth=0,
+            symbolType="square",
+            values=legend_sort
+          )
+      ),
+      tooltip=[
+          alt.Tooltip('uf:N', title='Estado'),
+          alt.Tooltip('nome:N', title="Município"),
+          alt.Tooltip("TOTAL_VOTOS_MUNIC_22:Q", format=",d", title=f"{tooltip_title_22[0]}"),
+          alt.Tooltip("TOTAL_VOTOS_MUNIC_18:Q", format=",d", title=f"{tooltip_title_18[0]}"),
+          alt.Tooltip("QT_VOTOS_VALIDOS_22:Q", format=",d", title=f"{tooltip_title_22[1]}"),
+          alt.Tooltip("QT_VOTOS_VALIDOS_18:Q", format=",d", title=f"{tooltip_title_18[1]}"),
+          alt.Tooltip("PCT_VOTOS_MUNIC_22:Q", format=".2%", title=f"{tooltip_title_22[2]}"),
+          alt.Tooltip("PCT_VOTOS_MUNIC_18:Q",format=".2%", title=f"{tooltip_title_18[2]}"),
+          alt.Tooltip("QT_DIFF:Q", format=",d", title="Diff. Votos"),
+          alt.Tooltip("PCT_DIFF:Q", format=".2%", title="Diff. % Votos")      
+    ]
+    ).transform_lookup(
+      lookup='codigo_ibge',
+      from_=alt.LookupData(cities, key="properties.id"),
+      as_='geo'
+    ).properties(width=600)
+  ) 
+
+  return (
+    alt.layer(background_states, cities_map)
+    .properties(title=f"{chart_title}")
+    .configure_title(anchor="middle")
+  )
+
+##  Mapas resumo
 
 ##  df_totais:pl.DataFrame -> votos totais por região
 ##  year:int -> ano da eleição
@@ -212,7 +432,7 @@ def map_resume(
       base,
       (
           base
-          .mark_text(fontSize=10, yOffset=-25, angle=270)
+          .mark_text(fontSize=8, yOffset=-25, angle=270)
           .encode(color=alt.value("#000"))
       )
   )
@@ -268,8 +488,8 @@ with st.sidebar:
     regioes = st.multiselect('Regiões', regions_list, default=regions_list)
     disputa = st.radio("Escolha o Cruzamento", cruzamentos, horizontal=False)
     
-    color_theme_list = ['blues', 'cividis', 'greens', 'inferno', 'magma', 'plasma', 'reds', 'rainbow', 'turbo', 'viridis']
-    selected_color_theme = st.selectbox('Select a color theme', color_theme_list)
+    #color_theme_list = ['blues', 'cividis', 'greens', 'inferno', 'magma', 'plasma', 'reds', 'rainbow', 'turbo', 'viridis']
+    #selected_color_theme = st.selectbox('Select a color theme', color_theme_list)
     
     #divide os dados relativos à escolha do cruzamento
     disputa_arr:list[str] = disputa.split(" ")
@@ -278,15 +498,20 @@ with st.sidebar:
     partido_a:str = disputa_arr[3]
     eleicao_a:int = np.int16( disputa_arr[4] )
 
-    df_poll_a:pl.DataFrame=df_poll_18 if eleicao_a==2018 else df_poll_22
-    df_poll_b:pl.DataFrame=df_poll_18 if eleicao_b==2018 else df_poll_22   
+    if regioes:
+        df_poll_a:pl.DataFrame=df_poll_18.filter(pl.col("NM_REGIAO").is_in(regioes)) if eleicao_a==2018 else df_poll_22.filter(pl.col("NM_REGIAO").is_in(regioes))
+        df_poll_b:pl.DataFrame=df_poll_18.filter(pl.col("NM_REGIAO").is_in(regioes)) if eleicao_b==2018 else df_poll_22.filter(pl.col("NM_REGIAO").is_in(regioes))
+    else:
+        df_poll_a:pl.DataFrame=df_poll_18 if eleicao_a==2018 else df_poll_22
+        df_poll_b:pl.DataFrame=df_poll_18 if eleicao_b==2018 else df_poll_22  
+    
 #######################
 # Dashboard Main Panel
-col = st.columns((1.5, 4.5, 2), gap='medium')
-
+col = st.columns((2, 3.5, 3.5), gap='small', border=True)
 
 with col[0]:
-    st.markdown('#### Resumo')
+    st.markdown('#### Resumos')
+    #st.subheader("Resumos")
     total_votos_18:np.int32 = (
         df_poll_18
         .get_column("QT_VOTOS_VALIDOS").sum()
@@ -314,12 +539,73 @@ with col[0]:
 
     st.metric(label=f"Total Votos {partido_a} {eleicao_a}", value=format_number(total_votos_a).replace(".",","),
              delta=format_number(total_votos_a-total_votos_b).replace(".",","))
-    
-with col[1]:
-    st.markdown('#### Mapas')
 
+with col[1]:
+    st.markdown(f'#### Mapa de Votação {partido_b} {eleicao_b}')
+    breaks = [.25, .4, .55],
+    domain = ["<=25%", ">25%,<=40%", ">40%,<=55%",">55%"]
+
+    mapa, df_choropleth_b = mapa_eleitoral(df_eleicao=df_poll_b, 
+           df_municipios=df_municipios,
+           df_capitais=df_capitais,
+           partido=partido_b, 
+           breaks = breaks,
+           domain = domain, 
+           opacity=.8,
+           legend_sort=domain[::-1],
+           rev_Schmeme=False)
+    mapa = mapa.configure_legend(
+              offset=-20,
+              titleFontSize=12,
+              labelFontSize=10            
+            )
+    
+    st.altair_chart(mapa, use_container_width=True)
+
+    st.markdown(f'#### Mapa de Votação {partido_a} {eleicao_a}')
+
+    mapa, df_choropleth_a = mapa_eleitoral(df_eleicao=df_poll_a, 
+           df_municipios=df_municipios,
+           df_capitais=df_capitais,
+           partido=partido_a, 
+           breaks = breaks,
+           domain = domain,
+           opacity=.8,
+           legend_sort=domain[::-1],
+           rev_Schmeme=False)
+    mapa=mapa.configure_legend(
+              offset=-20,
+              titleFontSize=12,
+              labelFontSize=10
+            )
+    st.altair_chart(mapa, use_container_width=True)
 with col[2]:
-    st.markdown(f'##### Votação {partido_b} {eleicao_b}')
+    st.markdown(f'#### Mapa Dif. Perc. {partido_b} {eleicao_b} {partido_a} {eleicao_a}')    
+    breaks = [-.1, -.01, .01, .1]
+    domain=["<-10%", ">-10% e <=-1%", ">-1%,<=1%",">1% e <=10%", ">10%"]   
+    legend_title = f"Dif. {partido_b} {eleicao_b} - {partido_a} {eleicao_a}"
+    mapa = prepara_mapa_diferenca(        
+        df_choropleth_a = df_choropleth_a, 
+        df_choropleth_b = df_choropleth_b, 
+        df_capitais=df_capitais,
+        breaks = breaks,
+        domain=domain,
+        chart_title="", 
+        rev_Schmeme=False,
+        opacity=.8,
+        legend_sort=domain[::-1],
+        tooltip_title_22=["Total Votos Munic. 2022","Tot Votos PT 2022", "Perc. Votos PT 2022"],
+        tooltip_title_18=["Total Votos Munic. 2018","Tot Votos PT 2018", "Perc. Votos PT 2018"],
+        legend_title=legend_title
+    )
+    mapa=mapa.configure_legend(
+          offset=-20,
+          titleFontSize=12,
+          labelFontSize=10
+        )
+    
+    st.altair_chart(mapa, use_container_width=True)
+    st.markdown(f'#### Votação {partido_b} {eleicao_b}')
     #
     df_res_part_reg = votting_by_region(
         df=df_poll_b, 
@@ -339,13 +625,13 @@ with col[2]:
         map_resume(df_totais=df_resume, color=color).configure_title(
             anchor="middle"
         ).configure_axis(
-            grid=False
+            grid=True
         ).configure_view(
-            strokeWidth=0
+            strokeWidth=.5
         ).properties(height=250),use_container_width=True
     )    
 
-    st.markdown(f'##### Votação {partido_a} {eleicao_a}')
+    st.markdown(f'#### Votação {partido_a} {eleicao_a}')
     #
     df_res_part_reg = votting_by_region(
         df=df_poll_a, 
@@ -365,8 +651,9 @@ with col[2]:
         map_resume(df_totais=df_resume, color=color).configure_title(
             anchor="middle"
         ).configure_axis(
-            grid=False
+            grid=True
         ).configure_view(
-            strokeWidth=0
+            stroke='#E3E3E3',
+            strokeWidth=.5
         ).properties(height=250),use_container_width=True
     )      
