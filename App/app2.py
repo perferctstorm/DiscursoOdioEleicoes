@@ -1,3 +1,4 @@
+## https://blog.streamlit.io/crafting-a-dashboard-app-in-python-using-streamlit/
 #######################
 # Import libraries
 import streamlit as st
@@ -681,7 +682,6 @@ with tabMapas:
         with col_2:
             st.write(f'Votação {partido_a} {eleicao_a}')
             st.altair_chart(donut_part_a)
-        #st.markdown(f'#### Votação {partido_b} {eleicao_b}')
         #
         #df_res_part_reg = votting_by_region(
         #    df=df_poll_b, 
@@ -733,3 +733,14 @@ with tabMapas:
         #        strokeWidth=.5
         #    ).properties(height=250),use_container_width=True
         #)      
+rodape = st.columns(1)
+with rodape[0]:
+    with st.expander('Sobre', expanded=True):
+        st.write('''
+            - S. de Oliveira, Antonio Fagner
+            - :orange[**Desmistificando 2022: Quem Definiu aEleição Mais Importante do Século?**]
+            - Monografia (especialização) – Universidade Federal do Rio Grande do Sul. Curso de Especialização em Ciência de Dados, Porto Alegre, BR–RS, 2025
+            - Orientadora: Profa. Dra. Lisiane Selau
+            - Co-orientador: Profa. Dra. Viviane P. Moreira
+            - Ciência de Dados, Eleições Brasileiras, Estatística, Narrativa, Nordeste, Sudeste, Visualização de Dados.
+            ''')
