@@ -924,17 +924,15 @@ def scatter_votting_by_regions(
     opacity=.5,
     axis_cols:list[str]=["PCT_VOTOS_18","PCT_VOTOS_22"],
     axis_col_titles:list[str]=["Perc. Votos em 2018","Perc. Votos em 2022"],
-    axis_titles:list[str]=["2018","2022"]
+    axis_titles:list[str]=["2018","2022"],
+    color_column:str="LEGEND"
   )->alt.vegalite.v5.api.Chart:
 
-  if color_range:
-    color = alt.condition(
+  color = alt.condition(
         alt.datum.PCT_VOTOS_18 >= alt.datum.PCT_VOTOS_22,
           alt.value(color_range[0]),
           alt.value(color_range[1])
-    )
-  else:
-    color = alt.Color("SG_PARTIDO:N", legend=None, scale=alt.Scale(scheme=scheme))
+  )
 
   scatter_plot = (
       alt.Chart()
@@ -1113,7 +1111,7 @@ def kde_plot(df:pl.DataFrame, groupby:list[str]=['ANO_ELEICAO', 'NM_REGIAO'],
             labelAngle=-90
           )
       ),
-      y=alt.Y('density:Q', title="").stack(None),
+      y=alt.Y('density:Q', axis=alt.Axis(labels=False), title="").stack(None),
       color=alt.Color(f"{color_column}:N", scale=scale, title=f"{legend_title}")
       #color=alt.Color("SG_PARTIDO:N", scale=scale, title='Partido')
     ).facet(
@@ -1130,18 +1128,32 @@ def kde_plot(df:pl.DataFrame, groupby:list[str]=['ANO_ELEICAO', 'NM_REGIAO'],
 ###
 def bar_plot(df:pl.DataFrame, metric_col:str="Voto", 
              scale=alt.Scale(domain=[0,25_000_000]),
-             axis_format="s", text_format=",")->alt.vegalite.v5.api.Chart:
+             axis_format="s", text_format=",",
+             color_range=[],
+              )->alt.vegalite.v5.api.Chart:
     
     base = alt.Chart(df, width=alt.Step(12)).encode(
         x=alt.X(f"NM_REGIAO:N", title=""),
         y=alt.Y(f"{metric_col}:Q", title="", scale=scale, axis=alt.Axis(format=f"{axis_format}")),
-        xOffset=alt.XOffset("SG_PARTIDO:N", scale=alt.Scale(paddingOuter=0.2))
+        xOffset=alt.XOffset(
+            "LEGEND:N", 
+            scale=alt.Scale(paddingOuter=0.2),            
+        ),
     )            
     return alt.layer(
         base.mark_bar(size=20, stroke="white", fillOpacity=0.7).encode(
-            fill=alt.Fill("SG_PARTIDO:N", title="Partido", scale=alt.Scale(range=ideol_range_colors[::-1]))
+            fill=alt.Fill(
+                "LEGEND:N", 
+                title="Partido", 
+                scale=alt.Scale(range=color_range),
+                legend=alt.Legend(symbolSize=300)
+            )
         ),
-        base.mark_text(dx=30, angle=270, fontSize=12).encode(text=alt.Text(f"{metric_col}:Q", format=f"{text_format}")),
+        base.mark_text(
+            dx=25, angle=270, fontSize=12
+        ).encode(
+            text=alt.Text(f"{metric_col}:Q", format=f"{text_format}")
+        )
     )
 #######################
 # Load data
@@ -1215,13 +1227,28 @@ with st.sidebar:
 tabResumos, tabMapas, tabGrafs, tabCapitais = st.tabs(["Geral", "Mapas e Resumos", "Gráficos Gerais", "Capitais"]) 
 
 ## datasets para plotar os gráficos
-df_poll_partido_a = df_poll_a.filter(pl.col("SG_PARTIDO")==partido_a).join(
-    df_municipios, left_on="CD_MUNICIPIO", right_on="codigo_tse", how="inner"
-).drop(pl.col(["capital","ddd"])).select(["ANO_ELEICAO","NM_REGIAO","uf","CD_MUNICIPIO","nome","SG_PARTIDO","PCT_VOTOS_MUNIC","TOTAL_VOTOS_MUNIC","QT_VOTOS_VALIDOS"])
+df_poll_partido_a = (
+    df_poll_a
+        .filter(pl.col("SG_PARTIDO")==partido_a)
+        .join(df_municipios, left_on="CD_MUNICIPIO", right_on="codigo_tse", how="inner")
+        .drop(pl.col(["capital","ddd"]))
+        .select(["ANO_ELEICAO","NM_REGIAO","uf","CD_MUNICIPIO","nome","SG_PARTIDO",
+                 "PCT_VOTOS_MUNIC","TOTAL_VOTOS_MUNIC","QT_VOTOS_VALIDOS"])
+        .with_columns(
+            pl.lit(f"{partido_a} {eleicao_a}").alias("LEGEND")
+        ) 
+)
 
-df_poll_partido_b = df_poll_b.filter(pl.col("SG_PARTIDO")==partido_b).join(
-    df_municipios, left_on="CD_MUNICIPIO", right_on="codigo_tse", how="inner"
-).drop(pl.col(["capital","ddd"])).select(["ANO_ELEICAO","NM_REGIAO","uf","CD_MUNICIPIO","nome","SG_PARTIDO","PCT_VOTOS_MUNIC","TOTAL_VOTOS_MUNIC","QT_VOTOS_VALIDOS"])
+df_poll_partido_b = (
+    df_poll_b
+        .filter(pl.col("SG_PARTIDO")==partido_b)
+        .join(df_municipios, left_on="CD_MUNICIPIO", right_on="codigo_tse", how="inner")
+        .drop(pl.col(["capital","ddd"]))
+        .select(["ANO_ELEICAO","NM_REGIAO","uf","CD_MUNICIPIO","nome","SG_PARTIDO","PCT_VOTOS_MUNIC","TOTAL_VOTOS_MUNIC","QT_VOTOS_VALIDOS"])
+        .with_columns(
+            pl.lit(f"{partido_b} {eleicao_b}").alias("LEGEND")
+        )    
+)
 
 df_poll_box = pl.concat([df_poll_partido_b,df_poll_partido_a])
 
@@ -1241,27 +1268,40 @@ df_resumos = (pl.concat([
                 .agg(
                     pl.col("QT_VOTOS_VALIDOS").sum().alias("Voto")
                 ).join((
-                        df_poll_partido_a
+                        df_poll_partido_b
                             .select(["NM_REGIAO","TOTAL_VOTOS_MUNIC"])
                             .group_by("NM_REGIAO")
                             .agg(pl.col("TOTAL_VOTOS_MUNIC").sum().alias("TOTAL_REGIAO"))
-                ), on="NM_REGIAO")
+                ), on="NM_REGIAO").with_columns(
+                    pl.lit(f"{partido_b} {eleicao_b}").alias("LEGEND")
+                )               
           ),
           (df_poll_partido_a
                .group_by(["SG_PARTIDO","NM_REGIAO"])
                 .agg(
                     pl.col("QT_VOTOS_VALIDOS").sum().alias("Voto")
                 ).join((
-                        df_poll_partido_b
+                        df_poll_partido_a
                             .select(["NM_REGIAO","TOTAL_VOTOS_MUNIC"])
                             .group_by("NM_REGIAO")
                             .agg(pl.col("TOTAL_VOTOS_MUNIC").sum().alias("TOTAL_REGIAO"))
-                ), on="NM_REGIAO")
+                ), on="NM_REGIAO").with_columns(
+                    pl.lit(f"{partido_a} {eleicao_a}").alias("LEGEND")
+                )
           )]).with_columns(
               (pl.col("Voto")/pl.col("TOTAL_REGIAO")).alias("PERCENTUAL")
           )
     )
 
+#Ajusta as cores do gráfico de barras
+if partido_b == "PT" and partido_a != "PT":
+    color_range = ["#347DB6", "#BC3439"] #vermelho, azul
+elif partido_a == "PT" and partido_b=="PT":
+    color_range = ["#D68186","#BC3439"]
+elif partido_a != "PT" and partido_b!="PT":
+    color_range = ["#7e81e9","#bfc1f4"]
+else:
+    color_range = ["#347DB6", "#BC3439"] 
 #df_resumos = (
 #    df_poll_partido_a
 #        .select(["NM_REGIAO","TOTAL_VOTOS_MUNIC"])
@@ -1434,6 +1474,8 @@ with tabMapas:
                  delta=format_number(total_votos_part_a-total_votos_part_b).replace(".",","))    
 
     with row[1]:
+        st.write(df_resumos)
+        
         st.markdown("#### Percentual Votação", unsafe_allow_html=True)
         col_1, col_2 = st.columns([1,1])
         #######################################################################
@@ -1461,14 +1503,21 @@ with tabMapas:
             st.markdown(f'###### Votação {partido_a} {eleicao_a}')            
             st.altair_chart(donut_part_a, use_container_width=True)
     with row[2]:
-        abs_plot = bar_plot(df_resumos)
+        abs_plot = bar_plot(df_resumos, text_format=".3s", 
+                            color_range=color_range
+                           )
         st.markdown(f"#### Votação por Região {partido_b} {eleicao_b} x {partido_a} {eleicao_a}", unsafe_allow_html=True)
         st.altair_chart(abs_plot, use_container_width=True)
 
         scale=alt.Scale(domain=[0,1.])
         axis_format="%"
         text_format=".2%"
-        perc_plot = bar_plot(df_resumos, metric_col="PERCENTUAL", scale=scale, axis_format=axis_format,text_format=text_format)
+        perc_plot = bar_plot(df_resumos, 
+                             metric_col="PERCENTUAL", 
+                             scale=scale, 
+                             axis_format=axis_format,
+                             text_format=text_format,
+                             color_range=color_range)
         st.markdown(f"#### Votação Perc. por Região {partido_b} {eleicao_b} x {partido_a} {eleicao_a}", unsafe_allow_html=True)
         st.altair_chart(perc_plot, use_container_width=True)
         
@@ -1477,12 +1526,17 @@ with tabMapas:
 with tabGrafs:
     row = st.columns((1, 1), gap='small', border=True)
     with row[0]:
+        #st.write(df_poll_box)
         st.markdown(f'#### Boxplot Votação {partido_b} {eleicao_b} x {partido_a} {eleicao_a}')
+
+        #color_column = ("ANO_ELEICAO" if eleicao_a != eleicao_b else "SG_PARTIDO")
+        
         mapa = box_plots_votting_by_region(
             df_poll_box,
             chart_title=f"",
-            color_range=ideol_range_colors[::-1],
-            color_column="SG_PARTIDO", legend_title="Partido"
+            color_range=color_range,
+            color_column="LEGEND",
+            legend_title="Legenda"
         ).configure_axis(
             grid=True
         ).configure_view(
@@ -1495,25 +1549,27 @@ with tabGrafs:
         st.altair_chart(mapa, use_container_width=True)
 
         mapa = kde_plot(
-            df_poll_box.select(["ANO_ELEICAO","SG_PARTIDO","NM_REGIAO","PCT_VOTOS_MUNIC"]),
-            groupby=['NM_REGIAO','SG_PARTIDO'],
-            color_column="SG_PARTIDO",
-            color_range=ideol_range_colors[::-1],
-            legend_title="Partido", titulo="", num_cols=2).configure_axis(grid=True).configure_view(strokeWidth=1)
+            df_poll_box.select(["ANO_ELEICAO","SG_PARTIDO","LEGEND", "NM_REGIAO","PCT_VOTOS_MUNIC"]),
+            groupby=['NM_REGIAO','SG_PARTIDO',"LEGEND"],
+            color_column="LEGEND",
+            color_range=color_range,
+            legend_title="Legenda", titulo="", num_cols=2).configure_axis(grid=True).configure_view(strokeWidth=1)
 
         st.markdown(f'###### KDE Votação {partido_b} {eleicao_b} x {partido_a} {eleicao_a}')        
         st.altair_chart(mapa, use_container_width=True)        
 
     with row[1]:        
         st.markdown(f'#### Dispersão Votação {partido_b} {eleicao_b} x {partido_a} {eleicao_a}')
-        
+        _color_range = color_range
+        if partido_b=="PL" and partido_a=="PT":
+            _color_range = color_range[::-1]
         mapa = scatter_votting_by_regions(
             df_tmp.filter(pl.col("NM_REGIAO").is_in(["Centro-Oeste","Nordeste"])),
             chart_title="",
             opacity=.3,
-            color_range=ideol_range_colors[::-1],
+            color_range=_color_range,
             axis_col_titles=[f"Perc. Votos {partido_a}",f"Perc. Votos {partido_b}"],
-            axis_titles=[f"{partido_a}",f"{partido_b}"]
+            axis_titles=[f"{partido_a} {eleicao_a}", f"{partido_b} {eleicao_b}"]
         )
         st.altair_chart(mapa, use_container_width=True)        
         
@@ -1521,9 +1577,9 @@ with tabGrafs:
             df_tmp.filter(pl.col("NM_REGIAO").is_in(["Norte","Sudeste"])),
             chart_title="",
             opacity=.3,
-            color_range=ideol_range_colors[::-1],
+            color_range=_color_range,
             axis_col_titles=[f"Perc. Votos {partido_a}",f"Perc. Votos {partido_b}"],
-            axis_titles=[f"{partido_a}",f"{partido_b}"]
+            axis_titles=[f"{partido_a} {eleicao_a}", f"{partido_b} {eleicao_b}"]
         )
         st.altair_chart(mapa, use_container_width=True)
 
@@ -1531,11 +1587,10 @@ with tabGrafs:
             df_tmp.filter(pl.col("NM_REGIAO").is_in(["Sul"])),
             chart_title="",
             opacity=.3,
-            color_range=ideol_range_colors[::-1],
+            color_range=_color_range,
             axis_col_titles=[f"Perc. Votos {partido_a}",f"Perc. Votos {partido_b}"],
-            axis_titles=[f"{partido_a}",f"{partido_b}"]
+            axis_titles=[f"{partido_a} {eleicao_a}", f"{partido_b} {eleicao_b}"]
         )
-        st.markdown(f'###### KDE Votação {partido_b} {eleicao_b} x {partido_a} {eleicao_a}')
         st.altair_chart(mapa, use_container_width=True)
     #with row[2]:
 
