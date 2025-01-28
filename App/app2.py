@@ -1385,7 +1385,7 @@ with tabMapas:
                   labelFontSize=10            
                 )
         
-        #st.altair_chart(mapa, use_container_width=True)
+        st.altair_chart(mapa, use_container_width=True)
 
     with row[1]:
         st.markdown(f'###### Votação {partido_a} {eleicao_a}')
@@ -1406,7 +1406,7 @@ with tabMapas:
                   titleFontSize=12,
                   labelFontSize=10
                 )
-        #st.altair_chart(mapa, use_container_width=True)   
+        st.altair_chart(mapa, use_container_width=True)   
         
     #############################################################
     with row[2]:
@@ -1436,7 +1436,7 @@ with tabMapas:
             labelFontSize=10,              
         )
         
-        #st.altair_chart(mapa, use_container_width=True)
+        st.altair_chart(mapa, use_container_width=True)
         
     #############################################################        
     row = st.columns((1.5, 3.5, 3.5), gap='small', border=True)
@@ -1474,7 +1474,7 @@ with tabMapas:
                  delta=format_number(total_votos_part_a-total_votos_part_b).replace(".",","))    
 
     with row[1]:
-        st.write(df_resumos)
+        #st.write(df_resumos)
         
         st.markdown("#### Percentual Votação", unsafe_allow_html=True)
         col_1, col_2 = st.columns([1,1])
