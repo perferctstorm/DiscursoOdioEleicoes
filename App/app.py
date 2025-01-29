@@ -2,7 +2,6 @@
 # Import libraries
 import streamlit as st
 import altair as alt
-import plotly.express as px
 import polars as pl
 import numpy as np
 
