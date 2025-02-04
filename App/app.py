@@ -1130,8 +1130,14 @@ def bar_plot(df:pl.DataFrame, metric_col:str="Voto",
              scale=alt.Scale(domain=[0,25_000_000]),
              axis_format="s", text_format=",",
              color_range=[],
+             legend=True
               )->alt.vegalite.v5.api.Chart:
-    
+
+    if legend:
+        legend=alt.Legend(symbolSize=300)
+    else:
+        legend=None
+        
     base = alt.Chart(df, width=alt.Step(12)).encode(
         x=alt.X(f"NM_REGIAO:N", title=""),
         y=alt.Y(f"{metric_col}:Q", title="", scale=scale, axis=alt.Axis(format=f"{axis_format}")),
@@ -1146,7 +1152,7 @@ def bar_plot(df:pl.DataFrame, metric_col:str="Voto",
                 "LEGEND:N", 
                 title="Partido", 
                 scale=alt.Scale(range=color_range),
-                legend=alt.Legend(symbolSize=300)
+                legend=legend
             )
         ),
         base.mark_text(
@@ -1155,6 +1161,150 @@ def bar_plot(df:pl.DataFrame, metric_col:str="Voto",
             text=alt.Text(f"{metric_col}:Q", format=f"{text_format}")
         )
     )
+
+def crescimento(
+    summary:pl.DataFrame,
+    color_range:list[str]=year_range_colors,
+    y_domain:list[int]=[0, 60_000_000]
+    )->alt.vegalite.v5.api.Chart:
+
+  dy:float=6.
+  font_size:float=10.
+
+  scale = alt.Scale(
+      domain=["2018", "2022"],
+      range=color_range
+  )
+
+  base = (
+    alt.Chart(summary)
+  )
+
+  bar1 = base.transform_calculate(
+    ANO="'2018'"
+  ).mark_bar().encode(
+      x=alt.X("NM_REGIAO:N", title="",
+              #sort=alt.EncodingSortField("Crescimento"),
+              axis=alt.Axis(orient="bottom", values=[])),
+      y=alt.Y('Votos_18:Q', scale=alt.Scale(domain=y_domain), axis=alt.Axis(labels=False, ticks=False)),
+      color=alt.Color("ANO:N", scale=scale),
+      text=alt.Text('Votos_18:Q', format='.3s'),
+  )
+
+  bar2 = base.transform_calculate(
+    ANO="'2022'"
+  ).mark_bar().encode(
+      x=alt.X("NM_REGIAO:N", title="", #sort=alt.EncodingSortField("Crescimento"),
+              axis=alt.Axis(orient="bottom")),
+      y=alt.Y('Votos_18:Q', title=""),
+      y2=alt.Y2('Votos_22:Q'),
+      color=alt.Color("ANO:N", title="Eleiçao", scale=scale,legend=None,
+                      #legend=alt.Legend(direction="horizontal",
+                      #                  orient="none", legendX=55, legendY=320,
+                      #                  titleAnchor="middle")
+                      ),
+      text=alt.Text('Votos_22:Q', format='.3s'),
+  )
+
+  bar1_text = bar1.mark_text(
+        dy=dy, fontSize=font_size
+      ).encode(
+        x=alt.X("NM_REGIAO:N", title="",
+                #sort=alt.EncodingSortField("Crescimento"),
+                axis=alt.Axis(labels=False, ticks=False)),
+        y=alt.Y('Votos_18:Q', title=""),
+        color=alt.value("#000")
+  )
+
+  diff_text = base.transform_calculate(
+      text=alt.expr.if_((alt.datum.Votos_22-alt.datum.Votos_18)>0, "+", "") + alt.expr.format((alt.datum.Votos_22-alt.datum.Votos_18), ".3s"),
+      y=alt.expr.if_(
+          (alt.datum.Votos_22-alt.datum.Votos_18)<0,
+          (alt.datum.Votos_18-3_200_000),
+          alt.expr.if_((alt.datum.Votos_22-alt.datum.Votos_18) < 1_300_000,
+                       (alt.datum.Votos_18+1_200_000),
+                       (alt.datum.Votos_18 +  (alt.datum.Votos_22-alt.datum.Votos_18)/2))
+      )
+  ).mark_text(dy=0, fontSize=font_size-1).encode(
+      x=alt.X("NM_REGIAO:N", title="", #sort=alt.EncodingSortField("Crescimento"),
+              axis=alt.Axis(labels=False, ticks=False)),
+      y=alt.Y('y:Q', title=""),
+      text=alt.Text('text:N'),
+      color=alt.value("#000")
+  )
+
+  return (
+      alt.layer(bar1,bar2, bar1_text, diff_text)
+      .properties(width=180, height=250, title="Votação Absoluta")
+      .resolve_scale(x="independent")
+  )
+
+def votacao_regiao(
+    df_resumos:pl.DataFrame,
+    color_range:list[str]=year_range_colors,
+    y_domain:list[int]=[0, 60_000_000]
+    )->alt.vegalite.v5.api.Chart:
+    
+    base = alt.Chart(df_resumos).encode(
+        x=alt.X("NM_REGIAO:N", title=""),
+        y=alt.Y("Voto:Q", title="", scale=alt.Scale(domain=y_domain), axis=alt.Axis(format="s")),
+        xOffset=alt.XOffset("LEGEND:N", scale=alt.Scale(paddingOuter=0.0))
+    )
+    
+    return alt.layer(
+        base.mark_bar(size=20, stroke="white").encode(
+            fill=alt.Fill("LEGEND:N", title="", scale=alt.Scale(range=color_range))
+        ),
+        base.mark_text(
+            dx=20,
+            angle=270,        
+            fontSize=10).encode(text=alt.Text("Voto:Q", format=".4s"))
+    ).properties(width=180, height=250, title="Votação Absoluta")
+
+def total_brasil(
+    df_total:pl.DataFrame,
+    color_range:list[str]=year_range_colors,
+    y_domain:list[int]=[0, 60_000_000]
+)->alt.vegalite.v5.api.Chart:
+    base_partidos = (
+      alt.Chart(df_total).encode(
+        x=alt.X("LEGEND:N", title=""),
+      )
+      .encode(
+            y=alt.Y("Voto:Q", title="", scale=alt.Scale(domain=y_domain), axis=alt.Axis(format="s", ticks=False, labels=False)),
+      )
+    )
+    
+    return alt.layer(  
+        base_partidos
+        .mark_bar(size=20, stroke="white")
+        .encode(
+            fill=alt.Fill("LEGEND:N", legend=alt.Legend(title="Legenda", rowPadding=-10, symbolSize=250), scale=alt.Scale(range=color_range))
+        ),
+        base_partidos.mark_text(color="#000", dx=-20, angle=270, fontSize=10).encode(text=alt.Text("Voto:Q", format=".4s"))
+    ).properties(height=250, title="")
+
+def percentual_regiao(
+    df_resumos:pl.DataFrame,
+    color_range:list[str]=year_range_colors,
+    y_domain:list[int]=[.2, .7]
+)->alt.vegalite.v5.api.Chart:
+    base = alt.Chart(df_resumos).encode(
+        x=alt.X("NM_REGIAO:N", title=""),
+        y=alt.Y("PERCENTUAL:Q", title="", scale=alt.Scale(domain=y_domain), axis=alt.Axis(format=".0%")),
+    )        
+    return alt.layer(
+        base.mark_line(point=True).encode(
+            color=alt.Color("LEGEND:N", legend=alt.Legend(title="Partido"),
+                          scale=alt.Scale(range=color_range)
+            )
+        ),
+        base.mark_text(
+            fontSize=10,
+            dy=-10,
+        ).encode(text=alt.Text("PERCENTUAL:Q", format=".2%")),
+    ).properties(width=400, height=300, title="Votação Percentual")
+
 #######################
 # Load data
 #lista das regiões brasileiras
@@ -1273,7 +1423,8 @@ df_resumos = (pl.concat([
                             .group_by("NM_REGIAO")
                             .agg(pl.col("TOTAL_VOTOS_MUNIC").sum().alias("TOTAL_REGIAO"))
                 ), on="NM_REGIAO").with_columns(
-                    pl.lit(f"{partido_b} {eleicao_b}").alias("LEGEND")
+                    pl.lit(f"{partido_b} {eleicao_b}").alias("LEGEND"),
+                    pl.lit(f"{eleicao_b}").alias("ANO_ELEICAO")
                 )               
           ),
           (df_poll_partido_a
@@ -1286,7 +1437,8 @@ df_resumos = (pl.concat([
                             .group_by("NM_REGIAO")
                             .agg(pl.col("TOTAL_VOTOS_MUNIC").sum().alias("TOTAL_REGIAO"))
                 ), on="NM_REGIAO").with_columns(
-                    pl.lit(f"{partido_a} {eleicao_a}").alias("LEGEND")
+                    pl.lit(f"{partido_a} {eleicao_a}").alias("LEGEND"),
+                    pl.lit(f"{eleicao_a}").alias("ANO_ELEICAO")
                 )
           )]).with_columns(
               (pl.col("Voto")/pl.col("TOTAL_REGIAO")).alias("PERCENTUAL")
@@ -1360,7 +1512,26 @@ with tabResumos:
             ), 
             use_container_width=True
         )
-        
+    # Dashboard Main Panel
+    row = st.columns((1,1), gap='small', border=True)
+    #if eleicao_b==eleicao_a:
+    #    df_total = df_resumos.filter(pl.col("SG_PARTIDO")==partido_b).group_by("SG_PARTIDO").agg(pl.col("TOTAL_REGIAO").sum())
+    #    df_total = df_total.with_columns(
+    #        pl.lit(f"{eleicao_b}").alias("ANO_ELEICAO"),
+    #        pl.lit(f"{eleicao_b}").alias("LEGEND")
+    #    ).rename({"TOTAL_REGIAO":"Voto"})
+    #    total_colors = year_range_colors if eleicao_b==2018 else year_range_colors[::-1]
+    #else:
+    #    df_total = df_resumos.group_by(["SG_PARTIDO","ANO_ELEICAO","LEGEND"]).agg(pl.col("TOTAL_REGIAO").sum())
+    #    df_total = df_total.rename({"TOTAL_REGIAO":"Voto"})        
+    #    total_colors = year_range_colors    
+    
+    #with row[0]:
+    #    st.write(df_resumos)
+    #with row[1]:
+        #st.write(df_resumos.group_by("LEGEND").agg(
+        #    pl.col("Voto").sum()/pl.col("TOTAL_REGIAO").sum()
+        #))
 with tabMapas:
     row = st.columns((3.5, 3.5, 3.5), gap='small', border=True)
     with row[0]:
@@ -1385,7 +1556,7 @@ with tabMapas:
                   labelFontSize=10            
                 )
         
-        st.altair_chart(mapa, use_container_width=True)
+        #st.altair_chart(mapa, use_container_width=True)
 
     with row[1]:
         st.markdown(f'###### Votação {partido_a} {eleicao_a}')
@@ -1406,7 +1577,7 @@ with tabMapas:
                   titleFontSize=12,
                   labelFontSize=10
                 )
-        st.altair_chart(mapa, use_container_width=True)   
+        #st.altair_chart(mapa, use_container_width=True)   
         
     #############################################################
     with row[2]:
@@ -1424,8 +1595,8 @@ with tabMapas:
             rev_Schmeme=False,
             opacity=.8,
             legend_sort=domain[::-1],
-            tooltip_title_22=["Total Votos Munic. 2022","Tot Votos PT 2022", "Perc. Votos PT 2022"],
-            tooltip_title_18=["Total Votos Munic. 2018","Tot Votos PT 2018", "Perc. Votos PT 2018"],
+            tooltip_title_22=[f"Total Votos Munic. {eleicao_b}", f"Tot Votos {partido_b} {eleicao_b}", f"Perc. Votos {partido_b} {eleicao_b}"],
+            tooltip_title_18=[f"Total Votos Munic. {eleicao_a}", f"Tot Votos {partido_a} {eleicao_a}", f"Perc. Votos {partido_a} {eleicao_a}"],
             legend_title=legend_title
         )
         mapa=mapa.configure_legend(
@@ -1436,10 +1607,10 @@ with tabMapas:
             labelFontSize=10,              
         )
         
-        st.altair_chart(mapa, use_container_width=True)
+        #st.altair_chart(mapa, use_container_width=True)
         
     #############################################################        
-    row = st.columns((1.5, 3.5, 3.5), gap='small', border=True)
+    row = st.columns((1.5, 3, 3.5), gap='small', border=True)
     with row[0]:
         st.markdown('#### Indicadores')
         #st.subheader("Resumos")
@@ -1503,25 +1674,56 @@ with tabMapas:
             st.markdown(f'###### Votação {partido_a} {eleicao_a}')            
             st.altair_chart(donut_part_a, use_container_width=True)
     with row[2]:
-        abs_plot = bar_plot(df_resumos, text_format=".3s", 
-                            color_range=color_range
-                           )
-        st.markdown(f"#### Votação por Região {partido_b} {eleicao_b} x {partido_a} {eleicao_a}", unsafe_allow_html=True)
-        st.altair_chart(abs_plot, use_container_width=True)
+        #abs_plot = bar_plot(df_resumos, text_format=".3s", 
+        #                    color_range=color_range, legend=False
+        #                   )
 
-        scale=alt.Scale(domain=[0,1.])
-        axis_format="%"
-        text_format=".2%"
-        perc_plot = bar_plot(df_resumos, 
-                             metric_col="PERCENTUAL", 
-                             scale=scale, 
-                             axis_format=axis_format,
-                             text_format=text_format,
-                             color_range=color_range)
-        st.markdown(f"#### Votação Perc. por Região {partido_b} {eleicao_b} x {partido_a} {eleicao_a}", unsafe_allow_html=True)
-        st.altair_chart(perc_plot, use_container_width=True)
+        #scale=alt.Scale(domain=[0,1.])
+        #axis_format="%"
+        #text_format=".2%"
         
-        #st.write(df_resumos)
+        #perc_plot = bar_plot(df_resumos, 
+        #                     metric_col="PERCENTUAL", 
+        #                     scale=scale, 
+        #                     axis_format=axis_format,
+        #                     text_format=text_format,
+        #                     color_range=color_range)
+
+        #st.markdown(f"#### Votação por Região {partido_b} {eleicao_b} x {partido_a} {eleicao_a}", unsafe_allow_html=True)
+
+        partb_parta_abs = votacao_regiao(df_resumos, color_range=color_range)
+        #
+        df_total = df_resumos.group_by(["SG_PARTIDO","ANO_ELEICAO","LEGEND"]).agg(pl.col("Voto").sum())
+        total_partidos = total_brasil(df_total, color_range=color_range)
+
+        resume_plots = alt.hconcat(partb_parta_abs, total_partidos)        
+        if (partido_b == "PT" and partido_a=="PT" ) or (partido_b=="PL" and partido_a=="PSL"):
+            df_crescimento = df_tmp.group_by("NM_REGIAO").agg(
+                pl.col("QT_VOTOS_VALIDOS_22").sum().alias("Votos_22"),
+                pl.col("QT_VOTOS_VALIDOS_18").sum().alias("Votos_18"))             
+            if (partido_b=="PL"):
+                color_range = color_range[::-1]
+                
+            c = crescimento(df_crescimento, y_domain=[0,60_000_000], color_range=color_range).properties(width=220, height=250, title="Crescimento")        
+            resume_plots = alt.hconcat(resume_plots, c)
+        #col_1, col_2 = st.columns((1,1), gap='small')        
+        #with col_1:
+        st.markdown('#### Votos Válidos')
+        st.altair_chart(resume_plots
+        .resolve_scale(y='shared',color="independent")
+        .configure(
+            concat=alt.CompositionConfig(spacing=2)
+        ), use_container_width=False)
+        #with col_2:
+        #    st.markdown('###### Perc. Votos Válidos')            
+        #    st.altair_chart(perc_plot, use_container_width=True)        
+
+        line_perc = percentual_regiao(df_resumos, color_range=color_range)
+        st.altair_chart(
+            line_perc, 
+            use_container_width=False
+        )
+
 
 with tabGrafs:
     row = st.columns((1, 1), gap='small', border=True)
