@@ -1028,7 +1028,7 @@ def scatter_votting_by_regions(
           groupby=["NM_REGIAO"],
           median_22 = "median(PCT_VOTOS_22)",
       ).transform_calculate(
-        text=f"Mda. {axis_titles[1]}: " + alt.expr.format(alt.datum.median_22, ".2%")
+        text=f"Mna. {axis_titles[1]}: " + alt.expr.format(alt.datum.median_22, ".2%")
       ).encode(
         x=alt.value(x_text_value),  # pixels from left
         y=alt.value(y_text_value),  # pixels from top,
@@ -1556,7 +1556,7 @@ with tabMapas:
                   labelFontSize=10            
                 )
         
-        #st.altair_chart(mapa, use_container_width=True)
+        st.altair_chart(mapa, use_container_width=True)
 
     with row[1]:
         st.markdown(f'###### Votação {partido_a} {eleicao_a}')
@@ -1577,7 +1577,7 @@ with tabMapas:
                   titleFontSize=12,
                   labelFontSize=10
                 )
-        #st.altair_chart(mapa, use_container_width=True)   
+        st.altair_chart(mapa, use_container_width=True)   
         
     #############################################################
     with row[2]:
@@ -1607,7 +1607,7 @@ with tabMapas:
             labelFontSize=10,              
         )
         
-        #st.altair_chart(mapa, use_container_width=True)
+        st.altair_chart(mapa, use_container_width=True)
         
     #############################################################        
     row = st.columns((1.5, 3, 3.5), gap='small', border=True)
@@ -1801,9 +1801,9 @@ with rodape[0]:
     with st.expander('Sobre', expanded=True):
         st.write('''
             - S. de Oliveira, Antonio Fagner
-            - :orange[**Desmistificando 2022: Quem Definiu aEleição Mais Importante do Século?**]
+            - :orange[**Desmistificando 2022: Que Região Brasileira Definiu a Eleição Presidencial?**]
             - Monografia (especialização) – Universidade Federal do Rio Grande do Sul. Curso de Especialização em Ciência de Dados, Porto Alegre, BR–RS, 2025
             - Orientadora: Profa. Dra. Lisiane Selau
             - Co-orientador: Profa. Dra. Viviane P. Moreira
-            - Ciência de Dados, Eleições Brasileiras, Estatística, Narrativa, Nordeste, Sudeste, Visualização de Dados.
+            - Ciência de Dados, Eleições Brasileiras, Visualização de Dados.
             ''')
