@@ -1027,7 +1027,7 @@ with tabInter:
                       titleFontSize=12,
                       labelFontSize=10            
                     )            
-            #st.altair_chart(mapa, use_container_width=True) 
+            st.altair_chart(mapa, use_container_width=True) 
 
         with row[1]:
             #cria o mapa            
@@ -1047,7 +1047,7 @@ with tabInter:
                       titleFontSize=12,
                       labelFontSize=10
                     )
-            #st.altair_chart(mapa, use_container_width=True)                 
+            st.altair_chart(mapa, use_container_width=True)                 
         with row[2]:            
             breaks = [-.1, -.01, .01, .1]
             domain=["<-10%", ">-10% e <=-1%", ">-1%,<=1%",">1% e <=10%", ">10%"]   
@@ -1073,7 +1073,7 @@ with tabInter:
                 titleFontSize=12,
                 labelFontSize=10,              
             )            
-            #st.altair_chart(mapa, use_container_width=True)        
+            st.altair_chart(mapa, use_container_width=True)        
             
         row = st.columns((1, 3), gap='large', border=False) 
         #vamos usar a primeira célula
