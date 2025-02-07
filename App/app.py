@@ -7,6 +7,9 @@ import polars as pl
 import numpy as np
 import pandas as pd
 
+#disabilita o limite de 5.000 para processamento imposto pelo altair
+alt.data_transformers.disable_max_rows()
+
 year_range_colors:list[str] = ['#F3AD58','#9489BB']
 ideol_range_colors:list[str] = ["#BC3439", "#347DB6"]
 
@@ -1101,90 +1104,73 @@ def scatter_votting_by_regions(
       title=f'{chart_title}', height=250, width=250
   )
 
-def bar_plot_cidades(
-    summary:pl.DataFrame,
-    color_range:list[str]=["#C54B53", "#D68186"],
+def line_plot_capitals(
+    df:pl.DataFrame, chart_title:str,
+    color_range:list[str]=["#B3B2D6","#1A67AC"],
     y_domain:list[int]=[0, 1.],
-    y_rule:float=.5
-    )->alt.vegalite.v5.api.Chart:
+    region:str="",
+    color_column:str="ANO_ELEICAO",
+    legend_title="Eleição",
+    y_title="Percentual de votos",
+    filter_col:str="ANO_ELEICAO",
+    filter_values=[2018,2022])->alt.vegalite.v5.api.Chart:
 
-  font_size:float=10.
+  scale=alt.Scale(range=color_range)
 
-  scale = alt.Scale(
-      domain=["Geral","Partido"],
-      range=color_range
+  base = alt.Chart(df).encode(
+    x=alt.X("nome:N", title=""),
+    y=alt.Y("PCT_VOTOS_MUNIC:Q", title=f"{y_title}", scale=alt.Scale(domain=y_domain), axis=alt.Axis(format=".0%"))
   )
 
-  base = (
-    alt.Chart(summary)
+  lines = base.mark_line(
+      opacity=.9,
+      point=alt.OverlayMarkDef(filled=True, opacity=.9, size=140)
+  ).encode(
+    color=alt.Color(f"{color_column}:N", title=f"{legend_title}", scale=scale),
+    tooltip=[
+        alt.Tooltip('ANO_ELEICAO:N', title='Ano da Eleição'),
+        alt.Tooltip('uf:N', title='Estado'),
+        alt.Tooltip('nome:N', title='Capital'),
+        alt.Tooltip("TOTAL_VOTOS_MUNIC:Q", format=",d", title="Total Geral de Votos"),
+        alt.Tooltip("QT_VOTOS_VALIDOS:Q", format=",d", title="Total Votos Partido"),
+        alt.Tooltip('PCT_VOTOS_MUNIC:Q', format=".2%", title='Perc. Votos')
+    ]
+  ).properties(
+      title=f"{region}"
   )
 
-  bar1 = base.transform_calculate(
-    tp_cresc="'Partido'"
-  ).mark_bar().encode(
-      x=alt.X("nome:N", title="", #sort=alt.EncodingSortField("Crescimento")
-      ),
-      y=alt.Y('Crescimento:Q', title="", scale=alt.Scale(domain=y_domain)),
-      color=alt.Color("tp_cresc:N", scale=scale,
-                      title="Crescimento",
-                      legend=None),
-      text=alt.Text('Crescimento:Q', format=".2%"),
-  )
+  dotted_lines = base.mark_line(opacity=.4, strokeDash=[12,8], color="#5EAFC0").encode(
+        alt.Y("min(PCT_VOTOS_MUNIC):Q"),
+        alt.Y2("max(PCT_VOTOS_MUNIC):Q")
+    )
 
-  bar1_text = bar1.mark_text(fontSize=9, dx=-20, baseline='middle', angle=270).encode(
-      x=alt.X("nome:N", title="", #sort=alt.EncodingSortField("Crescimento")
-      ),
-      y=alt.Y('Crescimento', title="", scale=alt.Scale(domain=y_domain)),
+   #   text=alt.expr.if_((alt.datum.Mdna_22-alt.datum.Mdna_18)>0, "+", "") +
+   #                     alt.expr.format((alt.datum.Mdna_22-alt.datum.Mdna_18), ".2%"),
+
+  df_diff = df.filter(
+      pl.col(f"{filter_col}")==filter_values[0]
+  ).join(
+      (df.filter(pl.col(f"{filter_col}")==filter_values[1])),
+      on="nome"
+  ).select(
+      ["nome","QT_VOTOS_VALIDOS","QT_VOTOS_VALIDOS_right","PCT_VOTOS_MUNIC","PCT_VOTOS_MUNIC_right"]
+  ).rename({"QT_VOTOS_VALIDOS":"QT_VOTOS_18",
+            "QT_VOTOS_VALIDOS_right":"QT_VOTOS_22",
+            "PCT_VOTOS_MUNIC":"PCT_VOTOS_18",
+            "PCT_VOTOS_MUNIC_right":"PCT_VOTOS_22"})
+
+  diff_text = alt.Chart(df_diff).transform_calculate(
+      text=alt.expr.if_((alt.datum.QT_VOTOS_22-alt.datum.QT_VOTOS_18)>0, "+", "") +
+        alt.expr.format((alt.datum.QT_VOTOS_22-alt.datum.QT_VOTOS_18), ".3s"),
+      y=(alt.datum.PCT_VOTOS_18 +  (alt.datum.PCT_VOTOS_22-alt.datum.PCT_VOTOS_18)/2)
+  ).mark_text(angle=270, fontSize=10, fontWeight=500).encode(
+      x=alt.X("nome:N", title=""),
+      y=alt.Y('y:Q', title=""),
+      text=alt.Text('text:N'),
       color=alt.value("#000")
   )
 
-  line = base.transform_calculate(
-      text="Evol. Mna: " +
-        alt.expr.format(alt.expr.max(alt.datum.Crescimento_Regiao), ".2%"),
-  ).mark_rule(color='steelblue', opacity=.7, strokeWidth=1, strokeDash=[8,4] ).encode(
-      y='mean(Crescimento_Regiao):Q',
-      #text=alt.Text('mean(Crescimento_Regiao):Q', format=".2%"),
-      text='text:N'
-  )
-
-  line_text = line.mark_text(fontSize=8, align='left', dy=0, dx=10).encode(
-      x=alt.X("max(nome):N")
-  )
-
-  circle = line_text.mark_circle(size=50, dx=100).encode(
-      x=alt.X("max(nome):N"),
-      y='mean(Crescimento_Regiao):Q',
-  )
-
-  return (
-      alt.layer(bar1,bar1_text, line, line_text)
-      .resolve_scale(x="shared")
-  )
-
-def summary_by_region(df_tmp:pl.DataFrame, df_cresc_perc_regiao:pl.DataFrame, region:str="")->pl.DataFrame:
-  return (
-    (
-    df_tmp.filter(
-          (pl.col("ANO_ELEICAO")==2018) &
-          (pl.col("NM_REGIAO")==f"{region}")
-      ).select(
-          ["NM_REGIAO","nome", "PCT_VOTOS_MUNIC"]
-      ).rename({"PCT_VOTOS_MUNIC":"PCT_VOTOS_18"})
-    ).join(
-      (
-        df_tmp.filter(
-            (pl.col("ANO_ELEICAO")==2022) &
-            (pl.col("NM_REGIAO")==f"{region}")
-        ).select(
-            ["NM_REGIAO","nome", "PCT_VOTOS_MUNIC"]
-        ).rename({"PCT_VOTOS_MUNIC":"PCT_VOTOS_22"})
-      ), on=["NM_REGIAO","nome"]
-    ).with_columns(
-        ( (pl.col("PCT_VOTOS_22")-pl.col("PCT_VOTOS_18"))/(pl.col("PCT_VOTOS_18"))).alias("Crescimento")
-    ).join(
-        df_cresc_perc_regiao, on="NM_REGIAO"
-    ).rename({"Crescimento_right":"Crescimento_Regiao"})
-  )
+  return alt.layer(lines, dotted_lines, diff_text)
 ##################################################################################
 ### Carga dos dados
 #lista das regiões brasileiras
@@ -1364,6 +1350,9 @@ with tabInter:
           )
     )    
 
+    #st.write(df_tmp)
+    #st.write(df_capitais)
+    #st.write(df_tmp)
     
     if eleicao_a<eleicao_b:
         X_ORDER = [f"{partido_a} {eleicao_a}", f"{partido_b} {eleicao_b}"]
