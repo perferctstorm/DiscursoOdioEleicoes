@@ -1734,7 +1734,7 @@ with tabInter:
                     (lines+rule_b+annotate_b+rule_a+annotate_a).configure_view(continuousHeight=1, continuousWidth=1, strokeWidth=2, stroke='#cecece'),
                     use_container_width=False
                 )            
-            st.write(df_poll_box)
+            #st.write(df_poll_box)
 
 rodape = st.columns(1)
 with rodape[0]:
