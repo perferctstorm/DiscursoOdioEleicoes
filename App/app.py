@@ -1405,7 +1405,7 @@ with tabInter:
                       titleFontSize=12,
                       labelFontSize=10            
                     )            
-            #st.altair_chart(mapa, use_container_width=True)                
+            st.altair_chart(mapa, use_container_width=True)                
 
         with row[1]:
             #cria o mapa 
@@ -1426,7 +1426,7 @@ with tabInter:
                       titleFontSize=12,
                       labelFontSize=10
                     )
-            #st.altair_chart(mapa, use_container_width=True)  
+            st.altair_chart(mapa, use_container_width=True)  
             
         with row[2]: 
             st.markdown(f'#### Diferença {partido_b} {eleicao_b} - {partido_a} {eleicao_a}')
@@ -1454,7 +1454,7 @@ with tabInter:
                 titleFontSize=12,
                 labelFontSize=10,              
             )            
-            #st.altair_chart(mapa, use_container_width=False)        
+            st.altair_chart(mapa, use_container_width=False)        
 
         #indicadores
         total_votos_18:np.int32 = (
