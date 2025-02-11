@@ -6,6 +6,7 @@ import altair as alt
 import polars as pl
 import numpy as np
 import pandas as pd
+from polars import selectors as cs
 
 #disabilita o limite de 5.000 para processamento imposto pelo altair
 alt.data_transformers.disable_max_rows()
@@ -1105,28 +1106,49 @@ def scatter_votting_by_regions(
   )
 
 def line_plot_capitals(
-    df:pl.DataFrame, chart_title:str,
+    df_poll_capitais:pl.DataFrame, 
+    df_poll:pl.DataFrame,
+    X_ORDER=[],
     color_range:list[str]=["#B3B2D6","#1A67AC"],
-    y_domain:list[int]=[0, 1.],
-    region:str="",
-    color_column:str="ANO_ELEICAO",
-    legend_title="Eleição",
-    y_title="Percentual de votos",
-    filter_col:str="ANO_ELEICAO",
-    filter_values=[2018,2022])->alt.vegalite.v5.api.Chart:
+    y_domain:list[int]=[0, 1.]
+)->alt.vegalite.v5.api.Chart:
 
-  scale=alt.Scale(range=color_range)
+    scale=alt.Scale(range=color_range)
 
-  base = alt.Chart(df).encode(
-    x=alt.X("nome:N", title=""),
-    y=alt.Y("PCT_VOTOS_MUNIC:Q", title=f"{y_title}", scale=alt.Scale(domain=y_domain), axis=alt.Axis(format=".0%"))
-  )
+    df_medians = (
+        df_poll
+        .group_by("LEGEND")
+        .agg( pl.col("PCT_VOTOS_MUNIC").median() )
+    )
+   
+    median_b:float = (
+        df_medians
+        .filter( (pl.col("LEGEND")==X_ORDER[0]) )
+        .get_column("PCT_VOTOS_MUNIC").item()
+    )
+    
+    median_a:float = (
+        df_medians
+        .filter( (pl.col("LEGEND")==X_ORDER[1]) )
+        .get_column("PCT_VOTOS_MUNIC").item()
+    )
 
-  lines = base.mark_line(
+    base = alt.Chart(df_poll_capitais).encode(
+        x=alt.X("nome:N", title="", axis=alt.Axis(grid=True)),
+        y=alt.Y(
+            "PCT_VOTOS_MUNIC:Q", 
+            title="", 
+            scale=alt.Scale(domain=y_domain), 
+            axis=alt.Axis(format=".1"))
+    ).add_selection(
+        alt.selection_interval(bind='scales')
+    )
+
+    lines = base.mark_line(
       opacity=.9,
       point=alt.OverlayMarkDef(filled=True, opacity=.9, size=140)
-  ).encode(
-    color=alt.Color(f"{color_column}:N", title=f"{legend_title}", scale=scale),
+    ).encode(
+        color=alt.Color("LEGEND:N", title="Legenda", scale=alt.Scale(range=color_range)),
     tooltip=[
         alt.Tooltip('ANO_ELEICAO:N', title='Ano da Eleição'),
         alt.Tooltip('uf:N', title='Estado'),
@@ -1135,42 +1157,112 @@ def line_plot_capitals(
         alt.Tooltip("QT_VOTOS_VALIDOS:Q", format=",d", title="Total Votos Partido"),
         alt.Tooltip('PCT_VOTOS_MUNIC:Q', format=".2%", title='Perc. Votos')
     ]
-  ).properties(
-      title=f"{region}"
-  )
-
-  dotted_lines = base.mark_line(opacity=.4, strokeDash=[12,8], color="#5EAFC0").encode(
+    ).properties(height=250, width=400)
+    
+    dotted_lines = base.mark_line(opacity=.4, strokeDash=[12,8], color="#5EAFC0").encode(
         alt.Y("min(PCT_VOTOS_MUNIC):Q"),
         alt.Y2("max(PCT_VOTOS_MUNIC):Q")
     )
-
-   #   text=alt.expr.if_((alt.datum.Mdna_22-alt.datum.Mdna_18)>0, "+", "") +
-   #                     alt.expr.format((alt.datum.Mdna_22-alt.datum.Mdna_18), ".2%"),
-
-  df_diff = df.filter(
-      pl.col(f"{filter_col}")==filter_values[0]
-  ).join(
-      (df.filter(pl.col(f"{filter_col}")==filter_values[1])),
-      on="nome"
-  ).select(
+    
+    df_diff = df_poll_capitais.filter(
+      pl.col("LEGEND")==X_ORDER[0]
+    ).join(
+      (df_poll_capitais.filter(pl.col("LEGEND")==X_ORDER[1])), on="nome"
+    ).select(
       ["nome","QT_VOTOS_VALIDOS","QT_VOTOS_VALIDOS_right","PCT_VOTOS_MUNIC","PCT_VOTOS_MUNIC_right"]
-  ).rename({"QT_VOTOS_VALIDOS":"QT_VOTOS_18",
+    ).rename({"QT_VOTOS_VALIDOS":"QT_VOTOS_18",
             "QT_VOTOS_VALIDOS_right":"QT_VOTOS_22",
             "PCT_VOTOS_MUNIC":"PCT_VOTOS_18",
             "PCT_VOTOS_MUNIC_right":"PCT_VOTOS_22"})
-
-  diff_text = alt.Chart(df_diff).transform_calculate(
+    
+    diff_text = alt.Chart(df_diff).transform_calculate(
       text=alt.expr.if_((alt.datum.QT_VOTOS_22-alt.datum.QT_VOTOS_18)>0, "+", "") +
         alt.expr.format((alt.datum.QT_VOTOS_22-alt.datum.QT_VOTOS_18), ".3s"),
       y=(alt.datum.PCT_VOTOS_18 +  (alt.datum.PCT_VOTOS_22-alt.datum.PCT_VOTOS_18)/2)
-  ).mark_text(angle=270, fontSize=10, fontWeight=500).encode(
+    ).mark_text(angle=270, fontSize=10, fontWeight=500).encode(
       x=alt.X("nome:N", title=""),
       y=alt.Y('y:Q', title=""),
       text=alt.Text('text:N'),
       color=alt.value("#000")
-  )
+    )
 
-  return alt.layer(lines, dotted_lines, diff_text)
+    off_set = -10 if median_b > median_a else 10
+
+    rule_xpos = df_poll_capitais.filter((pl.col("NM_REGIAO")==f"{region}") & (pl.col("LEGEND")==X_ORDER[0])).select(pl.col("nome").min()).item()
+
+    base = alt.Chart(
+        pl.DataFrame({'x':[rule_xpos], 'y': [median_b], 'text': [f'Mna. {X_ORDER[0]} {round(median_b*100,2)}%']})
+    ).encode(y='y')
+    
+    rule_b=base.mark_rule(strokeDash=(1,3), color=COLOR_RANGE[0])
+    
+    annotate_b = base.mark_text(fontSize=10,dx=40, dy=(median_b+off_set)).encode(
+        x='x',
+        text='text'
+    )
+
+    rule_xpos = df_poll_capitais.filter((pl.col("NM_REGIAO")==f"{region}") & (pl.col("LEGEND")==X_ORDER[1])).select(pl.col("nome").min()).item()
+    base = alt.Chart(
+        pl.DataFrame({'x':[rule_xpos], 'y': [median_a], 'text': [f'Mna. {X_ORDER[1]} {round(median_a*100,2)}%']})
+    ).encode(y='y')
+    
+    rule_a=base.mark_rule(strokeDash=(1,3), color=COLOR_RANGE[1])
+    
+    annotate_a = base.mark_text(fontSize=10, dx=40, dy=(median_a-off_set)).encode(
+        x='x',
+        text='text'
+    )                
+    
+    rule_a = alt.Chart(
+        pl.DataFrame({'y': [median_a]})
+    ).mark_rule(strokeDash=(1,3), color=COLOR_RANGE[1]).encode(y='y')   
+    
+    return alt.layer(lines, dotted_lines, diff_text, rule_b,annotate_b, rule_a,annotate_a)
+    
+def bar_plot_capitals(
+    df_diff_capitais:pl.DataFrame,
+    COLOR_RANGE=[],
+    region_median:float=0                
+)->alt.vegalite.v5.api.Chart:
+    predicate = alt.datum.Diff > 0
+    color = alt.when(predicate).then(alt.value(COLOR_RANGE[1])).otherwise(alt.value(COLOR_RANGE[0]))
+    dx=alt.expr(
+        alt.expr.if_(predicate > 0, 18, -20)
+    )     
+    base = alt.Chart(df_diff_capitais).mark_bar(opacity=.9).encode(
+        x=alt.X("nome:N", axis=alt.Axis(grid=True), title=""),
+        y=alt.Y("Diff:Q", title="",
+                scale=alt.Scale(domain=[-1,1])
+               ),
+        color=color,
+    ).add_selection(
+        alt.selection_interval(bind='scales')
+    )
+
+    #rule_ypos:float = df_diff.filter(pl.col("NM_REGIAO")==region).get_column("Mna. Diff").item()                
+    text_pos = df_diff_capitais.select(pl.col("nome").min()).get_column("nome").item()
+    
+    rule_base = alt.Chart(
+        pl.DataFrame({'x':[text_pos], 'y': [region_median], 'text': [f'Mna. Dif. {round(region_median*100,2)}%']})
+    ).encode(y='y')                
+    rule=rule_base.mark_rule(strokeDash=(1,3), color="#000")
+
+    annotate= rule_base.mark_text(fontSize=10,dx=25, dy=-10).encode(
+        x='x',
+        text=alt.Text('text')
+    )
+    
+    return alt.layer(
+        base,
+        base.mark_text(
+            dx=dx,
+            fontSize=9,
+            angle=270
+        ).encode(
+            text=alt.Text("Diff:Q", format=".2%"),
+            color=alt.value("#000")
+        ),rule,annotate
+    )     
 ##################################################################################
 ### Carga dos dados
 #lista das regiões brasileiras
@@ -1355,7 +1447,7 @@ with tabInter:
     df_poll_capitais = (df_poll_box
         .select(["LEGEND","ANO_ELEICAO","NM_REGIAO","uf","CD_MUNICIPIO","nome","TOTAL_VOTOS_MUNIC","QT_VOTOS_VALIDOS","PCT_VOTOS_MUNIC"])
         .join(df_capitais, left_on="CD_MUNICIPIO", right_on="codigo_tse")
-    )
+    ).select(~cs.ends_with("_right"))
     
     if eleicao_a<eleicao_b:
         X_ORDER = [f"{partido_a} {eleicao_a}", f"{partido_b} {eleicao_b}"]
@@ -1405,7 +1497,7 @@ with tabInter:
                       titleFontSize=12,
                       labelFontSize=10            
                     )            
-            st.altair_chart(mapa, use_container_width=True)                
+            #st.altair_chart(mapa, use_container_width=True)                
 
         with row[1]:
             #cria o mapa 
@@ -1426,7 +1518,7 @@ with tabInter:
                       titleFontSize=12,
                       labelFontSize=10
                     )
-            st.altair_chart(mapa, use_container_width=True)  
+            #st.altair_chart(mapa, use_container_width=True)  
             
         with row[2]: 
             st.markdown(f'#### Diferença {partido_b} {eleicao_b} - {partido_a} {eleicao_a}')
@@ -1454,7 +1546,7 @@ with tabInter:
                 titleFontSize=12,
                 labelFontSize=10,              
             )            
-            st.altair_chart(mapa, use_container_width=False)        
+            #st.altair_chart(mapa, use_container_width=False)        
 
         #indicadores
         total_votos_18:np.int32 = (
@@ -1655,86 +1747,88 @@ with tabInter:
                 use_container_width=False
             )
         with tabCapitais:
+            st.write(":mega: **Todas as medianas são sobre os valores de votação percentual por município.**")            
+            df_diff = (
+                df_poll_box.filter(pl.col("LEGEND")==X_ORDER[0])
+                .with_columns(
+                    pl.col("PCT_VOTOS_MUNIC").alias("PCT_VOTOS_18")
+                ).select(["NM_REGIAO","CD_MUNICIPIO","PCT_VOTOS_18"])
+            ).join(
+                (
+                    df_poll_box.filter(pl.col("LEGEND")==X_ORDER[1])
+                    .with_columns(
+                        pl.col("PCT_VOTOS_MUNIC").alias("PCT_VOTOS_22")
+                    ).select(["NM_REGIAO","CD_MUNICIPIO","PCT_VOTOS_22"])
+                ), on="CD_MUNICIPIO"
+            ).with_columns(
+                (pl.col("PCT_VOTOS_22")-pl.col("PCT_VOTOS_18")).alias("Diff")
+            ).group_by("NM_REGIAO").agg(pl.col("Diff").median().alias("Mna. Diff"))
+            
+            df_diff_capitais = (
+                df_poll_capitais
+                .filter(pl.col("LEGEND")==X_ORDER[0])
+                .join((df_poll_capitais.filter(pl.col("LEGEND")==X_ORDER[1])), on="nome")
+                .select(["nome","NM_REGIAO", "QT_VOTOS_VALIDOS","QT_VOTOS_VALIDOS_right","PCT_VOTOS_MUNIC","PCT_VOTOS_MUNIC_right"])
+                .rename({"QT_VOTOS_VALIDOS":"QT_VOTOS_18",
+                    "QT_VOTOS_VALIDOS_right":"QT_VOTOS_22",
+                    "PCT_VOTOS_MUNIC":"PCT_VOTOS_18",
+                    "PCT_VOTOS_MUNIC_right":"PCT_VOTOS_22"})
+                .with_columns(
+                    (pl.col("PCT_VOTOS_22")-pl.col("PCT_VOTOS_18")).alias("Diff")
+                )
+            )            
+
             max_domain = df_poll_capitais.select(pl.col("PCT_VOTOS_MUNIC").max()).item()+.1
-            min_domain = df_poll_capitais.select(pl.col("PCT_VOTOS_MUNIC").min()).item()-.1
+            min_domain = df_poll_capitais.select(pl.col("PCT_VOTOS_MUNIC").min()).item()-.1                
+            y_domain= [min_domain, max_domain]
+
+            st.markdown('#### Resumo Capitais')
+            line_plot = line_plot_capitals(
+                df_poll_capitais,
+                df_poll=df_poll_box,
+                X_ORDER=X_ORDER,
+                color_range=COLOR_RANGE,
+                y_domain=y_domain,
+            )  
             
-            #st.write(X_ORDER)
-            #st.write(COLOR_RANGE)
+            st.altair_chart(
+                (line_plot).properties(height=300, width=800),
+                use_container_width=False
+            )
             
+            #region_median = df_diff.filter(pl.col("NM_REGIAO")==region).get_column("Mna. Diff").item()
+            #bar_plot = bar_plot_capitals(
+            #    df_diff_capitais.filter(pl.col("NM_REGIAO")==region),
+            #    COLOR_RANGE = COLOR_RANGE,
+            #    region_median = region_median
+            #)                        
+        
             for region in stat_regions:
-                st.markdown(f'#### {region}')
-               
-                median_b:float = (
-                    df_poll_box
-                    .filter( (pl.col("NM_REGIAO")==f"{region}") & (pl.col("LEGEND")==X_ORDER[0]) )
-                    .select(pl.col("PCT_VOTOS_MUNIC").median()).item()
-                )
+                st.markdown(f'#### {region}')    
 
-                median_a:float = (
-                    df_poll_box
-                    .filter( (pl.col("NM_REGIAO")==f"{region}") & (pl.col("LEGEND")==X_ORDER[1]) )
-                    .select(pl.col("PCT_VOTOS_MUNIC").median()).item()
+                region_median = df_diff.filter(pl.col("NM_REGIAO")==region).get_column("Mna. Diff").item()
+                
+                bar_plot = bar_plot_capitals(
+                    df_diff_capitais.filter(pl.col("NM_REGIAO")==region),
+                    COLOR_RANGE = COLOR_RANGE,
+                    region_median = region_median
                 )
                 
-                base = alt.Chart(
+                line_plot = line_plot_capitals(
                     df_poll_capitais.filter(pl.col("NM_REGIAO")==region),
-                ).encode(
-                    x=alt.X("nome:N", title="", axis=alt.Axis(grid=True)),
-                    y=alt.Y("PCT_VOTOS_MUNIC:Q", title="", 
-                            scale=alt.Scale(domain=[min_domain, max_domain]), 
-                            axis=alt.Axis(format=".0", grid=True))
-                )                
-                lines = base.mark_line(
-                  opacity=.8,
-                  point=alt.OverlayMarkDef(filled=True, opacity=.9, size=140)
-                ).encode(
-                    color=alt.Color("LEGEND:N", title="Legenda", scale=alt.Scale(range=COLOR_RANGE)),
-                    tooltip=[
-                        alt.Tooltip('ANO_ELEICAO:N', title='Ano da Eleição'),
-                        alt.Tooltip('uf:N', title='Estado'),
-                        alt.Tooltip('nome:N', title='Capital'),
-                        alt.Tooltip("TOTAL_VOTOS_MUNIC:Q", format=",d", title="Total Geral de Votos"),
-                        alt.Tooltip("QT_VOTOS_VALIDOS:Q", format=",d", title="Total Votos Partido"),
-                        alt.Tooltip('PCT_VOTOS_MUNIC:Q', format=".2%", title='Perc. Votos')
-                    ]
-                ).properties(height=250, width=400)
-
-                off_set = -10 if median_b > median_a else 10
-
-                rule_xpos = df_poll_capitais.filter((pl.col("NM_REGIAO")==f"{region}") & (pl.col("LEGEND")==X_ORDER[0])).select(pl.col("nome").max()).item()
-
-                base = alt.Chart(
-                    pl.DataFrame({'x':[rule_xpos], 'y': [median_b], 'text': [f'Mna. {X_ORDER[0]} {round(median_b*100,2)}%']})
-                ).encode(y='y')
-                
-                rule_b=base.mark_rule(strokeDash=(1,3), color=COLOR_RANGE[0])
-                
-                annotate_b = base.mark_text(fontSize=10, dx=-10, dy=(median_b+off_set)).encode(
-                    x='x',
-                    text='text'
+                    df_poll=df_poll_box.filter(pl.col("NM_REGIAO")==region),
+                    X_ORDER=X_ORDER,
+                    color_range=COLOR_RANGE,
+                    y_domain=y_domain,
                 )
-
-                rule_xpos = df_poll_capitais.filter((pl.col("NM_REGIAO")==f"{region}") & (pl.col("LEGEND")==X_ORDER[1])).select(pl.col("nome").max()).item()
-                base = alt.Chart(
-                    pl.DataFrame({'x':[rule_xpos], 'y': [median_a], 'text': [f'Mna. {X_ORDER[1]} {round(median_a*100,2)}%']})
-                ).encode(y='y')
-                
-                rule_a=base.mark_rule(strokeDash=(1,3), color=COLOR_RANGE[1])
-                
-                annotate_a = base.mark_text(fontSize=10, dx=-10, dy=(median_a-off_set)).encode(
-                    x='x',
-                    text='text'
-                )                
-                
-                rule_a = alt.Chart(
-                    pl.DataFrame({'y': [median_a]})
-                ).mark_rule(strokeDash=(1,3), color=COLOR_RANGE[1]).encode(y='y')
-                
                 st.altair_chart(
-                    (lines+rule_b+annotate_b+rule_a+annotate_a).configure_view(continuousHeight=1, continuousWidth=1, strokeWidth=2, stroke='#cecece'),
+                    
+                    alt.hconcat(
+                        line_plot.properties(height=250, width=450),
+                        bar_plot.properties(height=250)
+                    ).configure_view(continuousHeight=1, continuousWidth=1, strokeWidth=2, stroke='#cecece'),
                     use_container_width=False
                 )            
-            #st.write(df_poll_box)
 
 rodape = st.columns(1)
 with rodape[0]:
