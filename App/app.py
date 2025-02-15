@@ -1473,7 +1473,7 @@ with tabInter:
     else:
        COLOR_RANGE= ["#7e81e9","#bfc1f4"]
             
-    tabMapas, tabGrafs, tabCapitais = st.tabs([":earth_americas: Mapas e Indicadores", ":chart_with_upwards_trend: Resumos Estatísticos", ":cityscape: Capitais"]) 
+    tabMapas, tabGrafs, tabCapitais = st.tabs([":earth_americas: Mapas e Indicadores", ":chart_with_upwards_trend: Regiões e UFs", ":cityscape: Capitais"]) 
 
     #mapas do brasil e resumos
     with tabMapas:
@@ -1597,13 +1597,14 @@ with tabInter:
         with row[0]:
             cells = st.columns((1,1,1), gap='small', border=False, vertical_alignment="center")
             with cells[0]:
-                st.metric(label='Votos Válidos em 2022', value=format_number(total_votos_22).replace(".",","), 
-                      #delta=format_number(total_votos_22-total_votos_18).replace(".",",")
-                         )
+                if not (eleicao_b==eleicao_a and eleicao_a==2018):
+                    st.metric(label=f'Votos Válidos em {eleicao_b}', value=format_number(total_votos_22).replace(".",","), 
+                          #delta=format_number(total_votos_22-total_votos_18).replace(".",",")
+                             )
             with cells[1]:
                 st.metric(label=f"Votos {partido_b} {eleicao_b}", value=format_number(total_votos_part_b).replace(".",","),
                  #delta=format_number(total_votos_part_b-total_votos_part_a).replace(".",",")
-            )
+                )
             with cells[2]:
                 st.altair_chart(donut_part_b, use_container_width=True) 
                 
@@ -1611,9 +1612,10 @@ with tabInter:
         with row[0]:
             cells = st.columns((1,1,1), gap='small', border=False, vertical_alignment="center")
             with cells[0]:
-                st.metric(label='Votos Válidos em 2018', value=format_number(total_votos_18).replace(".",","),
-                         #delta=format_number(total_votos_18-total_votos_22).replace(".",",")
-                         )
+                if not (eleicao_b==eleicao_a and eleicao_a==2022):                
+                    st.metric(label=f'Votos Válidos em {eleicao_a}', value=format_number(total_votos_18).replace(".",","),
+                        #delta=format_number(total_votos_18-total_votos_22).replace(".",",")
+                    )
             with cells[1]:
                 st.metric(label=f"Votos {partido_a} {eleicao_a}", value=format_number(total_votos_part_a).replace(".",","),
                  #delta=format_number(total_votos_part_a-total_votos_part_b).replace(".",",")
