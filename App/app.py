@@ -937,7 +937,7 @@ def kde_plot(df:pl.DataFrame,
       ),
       y=alt.Y('density:Q', axis=alt.Axis(labels=False), title="").stack(None),
       color=alt.Color(f"{color_column}:N", scale=scale, title=f"{legend_title}")
-    ).add_selection(
+    ).add_params (
         alt.selection_interval(bind='scales')
     ).properties(height=250, width=250)
   )   
@@ -985,7 +985,7 @@ def scatter_votting_by_regions(
           alt.Tooltip(f'{axis_cols[0]}:Q', format=".2%", title=f"Perc. Votos {axis_titles[0]}"),
 
         ],
-    ).add_selection(
+    ).add_params (
         alt.selection_interval(bind='scales')
     ).properties(
       width=170,
@@ -1143,7 +1143,7 @@ def line_plot_capitals(
             title="", 
             scale=alt.Scale(domain=y_domain), 
             axis=alt.Axis(format=".1"))
-    ).add_selection(
+    ).add_params(
         alt.selection_interval(bind='scales')
     )
 
@@ -1238,7 +1238,7 @@ def bar_plot_capitals(
                 scale=alt.Scale(domain=[-1,1])
                ),
         color=color,
-    ).add_selection(
+    ).add_params (
         alt.selection_interval(bind='scales')
     )
 
