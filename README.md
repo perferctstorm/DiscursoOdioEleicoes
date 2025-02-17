@@ -8,4 +8,5 @@
 #### Orientador: Profa. Dra. Lisiane Selau
 #### Co-orientador: Profa. Dra. Viviane P. Moreira
 
-## A ferramenta é oferecida a sociedade como forma de analisar os dados das eleições de 2018 e 2022 de maneira visual e interativa.
+## A ferramenta é oferecida à sociedade como forma de analisar os dados das eleições de 2018 e 2022 de maneira visual e interativa.
+
