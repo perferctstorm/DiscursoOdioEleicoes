@@ -383,17 +383,14 @@ def pyramid_votting_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_colors:
       ]
   ).mark_bar(opacity=.8).properties(title='2018')
 
-  #st.write(df_tmp_18)
-  #st.write(df_tmp_22)
-  max_pct = max(df_tmp_18.get_column("PCT").max(), df_tmp_22.get_column("PCT").max())+.05
-  max_abs = max(df_tmp_18.get_column("QT_VOTOS_VALIDOS").max(), df_tmp_22.get_column("QT_VOTOS_VALIDOS").max())+3_000_000
-    
+  max_abs = df_tmp_18.get_column("QT_VOTOS_BR").max()/2
+
   left_pct = left_base.encode(
       alt.X('PCT:Q',
           title='',
-          axis=alt.Axis(values=np.arange(0, 1.1, .05), format="%", labelAngle=-90),
+          axis=alt.Axis(values=np.arange(0,.55, .05), format="%", labelAngle=-90),
           sort="descending",
-          scale=alt.Scale(domain=[0, max_pct])
+          scale=alt.Scale(domain=[0, .5])
       )
   )  
 
@@ -431,10 +428,10 @@ def pyramid_votting_chart(df_2018:pl.DataFrame, df_2022:pl.DataFrame, df_colors:
       alt.X('PCT:Q',
             title="",
             axis=alt.Axis(values=np.arange(0, 1.1, .05), format="%", labelAngle=-90),
-            scale=alt.Scale(domain=[0, max_pct])
+            scale=alt.Scale(domain=[0, 0.5])
       ),
   )
-
+  max_abs = df_tmp_22.get_column("QT_VOTOS_BR").max()/2
   right_abs = right_base.encode(
       alt.X('QT_VOTOS_VALIDOS:Q',
           title='',
@@ -1882,9 +1879,9 @@ with rodape[0]:
     with st.expander('Sobre', expanded=True):
         st.write('''
             - S. de Oliveira, Antonio Fagner
-            - :orange[**Desmistificando 2022: Que Região Brasileira Definiu a Eleição Presidencial?**]
+            - :orange[**Análise da Migração dos Votos Regionais entre as Eleições Presidenciais Brasileiras de 2018 e 2022**]
             - Monografia (especialização) – Universidade Federal do Rio Grande do Sul. Curso de Especialização em Ciência de Dados, Porto Alegre, BR–RS, 2025
             - Orientadora: Profa. Dra. Lisiane Selau
             - Co-orientador: Profa. Dra. Viviane P. Moreira
-            - Ciência de Dados, Eleições Brasileiras, Estatística, Narrativa, Nordeste, Sudeste, Visualização de Dados.
+            - Ciência de Dados. Eleições Brasileiras. Visualização de Dados.
             ''')
